@@ -1,0 +1,273 @@
+export interface Listing {
+  id: string;
+  name: string;
+  sector: string;
+  location: string;
+  revenue: string;
+  ebitda?: string;
+  asking: string;
+  score: number;
+  verified: boolean;
+  premium: boolean;
+  photos: number;
+  employees?: number;
+  founded?: number;
+  description: string;
+  highlights?: string[];
+}
+
+export interface Review {
+  name: string;
+  role: string;
+  rating: number;
+  date: string;
+  text: string;
+}
+
+export interface Phase {
+  title: string;
+  desc: string;
+  ownership: number;
+}
+
+export interface TeamMember {
+  name: string;
+  role: string;
+  bio: string;
+}
+
+export interface Match {
+  listing: Listing;
+  fit: number;
+  reasons: string[];
+}
+
+export const LISTINGS: Listing[] = [
+  {
+    id: 'l-001',
+    name: 'Northwind Logistics',
+    sector: 'Logistics',
+    location: 'Rotterdam, NL',
+    revenue: '€2.4M / yr',
+    ebitda: '€480K',
+    asking: '€1.9M',
+    score: 92,
+    verified: true,
+    premium: true,
+    photos: 18,
+    employees: 14,
+    founded: 2014,
+    description:
+      'Boutique freight forwarder with a 9-year operating history, recurring B2B contracts (78% of revenue), and a tenured ops team. Strong margins from a niche route concentration between BeNeLux and DACH.',
+    highlights: [
+      'Recurring B2B contracts (78% of revenue)',
+      'Average customer tenure: 4.2 years',
+      'EBITDA margin 20% — 3-year stable',
+      'Owner transition: 6-month structured handover',
+    ],
+  },
+  {
+    id: 'l-002',
+    name: 'Halcyon Skincare',
+    sector: 'E-commerce / DTC',
+    location: 'Amsterdam, NL',
+    revenue: '€1.1M / yr',
+    ebitda: '€310K',
+    asking: '€1.4M',
+    score: 88,
+    verified: true,
+    premium: true,
+    photos: 24,
+    employees: 6,
+    founded: 2019,
+    description:
+      'Profitable DTC skincare brand with 42% gross margin and a 38K-subscriber list. Shopify + 3PL stack, lean ops, ready for paid-acquisition scaling.',
+    highlights: [
+      '42% gross margin, 28% net',
+      '38K email list, 18% open rate',
+      'Repeat purchase rate: 31%',
+      '3PL fulfilment + branded packaging',
+    ],
+  },
+  {
+    id: 'l-003',
+    name: 'Lumen Dental Group',
+    sector: 'Healthcare',
+    location: 'Utrecht, NL',
+    revenue: '€3.8M / yr',
+    asking: '€4.2M',
+    score: 76,
+    verified: true,
+    premium: false,
+    photos: 12,
+    employees: 22,
+    description: 'Two-location dental practice with full digital workflow and a long-tenured patient base.',
+  },
+  {
+    id: 'l-004',
+    name: 'Forge & Co. Bakery',
+    sector: 'Food & Beverage',
+    location: 'Antwerpen, BE',
+    revenue: '€780K / yr',
+    asking: '€620K',
+    score: 64,
+    verified: true,
+    premium: false,
+    photos: 9,
+    employees: 8,
+    description: 'Artisan bakery chain with two locations and a wholesale arm serving local restaurants.',
+  },
+  {
+    id: 'l-005',
+    name: 'Meridian SaaS',
+    sector: 'SaaS',
+    location: 'Berlin, DE',
+    revenue: '€1.9M ARR',
+    asking: '€7.6M',
+    score: 95,
+    verified: true,
+    premium: true,
+    photos: 14,
+    employees: 11,
+    description: 'B2B SaaS for field-service scheduling. 4x ARR multiple. Net dollar retention 118%.',
+  },
+  {
+    id: 'l-006',
+    name: 'Coastline Auto Service',
+    sector: 'Automotive',
+    location: 'Den Haag, NL',
+    revenue: '€1.3M / yr',
+    asking: '€890K',
+    score: 71,
+    verified: true,
+    premium: false,
+    photos: 11,
+    employees: 9,
+    description: 'Independent auto service garage with a 20-year reputation and steady repeat customers.',
+  },
+  {
+    id: 'l-007',
+    name: 'Atlas Print Studio',
+    sector: 'Services',
+    location: 'Eindhoven, NL',
+    revenue: '€640K / yr',
+    asking: '€480K',
+    score: 58,
+    verified: false,
+    premium: false,
+    photos: 6,
+    employees: 5,
+    description: 'Commercial print studio specialising in short-run packaging and branded merchandise.',
+  },
+  {
+    id: 'l-008',
+    name: 'Vesper Coffee Roasters',
+    sector: 'Food & Beverage',
+    location: 'Ghent, BE',
+    revenue: '€920K / yr',
+    asking: '€1.1M',
+    score: 81,
+    verified: true,
+    premium: true,
+    photos: 22,
+    employees: 7,
+    description: 'Specialty coffee roaster with wholesale + DTC channel and a flagship café.',
+  },
+  {
+    id: 'l-009',
+    name: 'Bright Stone Accounting',
+    sector: 'Professional Services',
+    location: 'Amsterdam, NL',
+    revenue: '€1.6M / yr',
+    asking: '€1.7M',
+    score: 84,
+    verified: true,
+    premium: false,
+    photos: 8,
+    employees: 12,
+    description: 'Boutique accounting firm with 240 SMB clients and 92% annual retention.',
+  },
+];
+
+export const SECTORS = [
+  'All sectors',
+  'SaaS',
+  'E-commerce / DTC',
+  'Logistics',
+  'Healthcare',
+  'Food & Beverage',
+  'Automotive',
+  'Professional Services',
+  'Services',
+];
+
+export const REVENUE_RANGES = ['Any revenue', '< €500K', '€500K – €1M', '€1M – €5M', '€5M+'];
+
+export const REVIEWS: Review[] = [
+  {
+    name: 'Marek S.',
+    role: 'Bought Halcyon Skincare',
+    rating: 5,
+    date: 'March 2026',
+    text: 'The phased ownership model removed the single biggest risk in the deal. By Phase 3 I had operating clarity I would never get from a traditional asset sale.',
+  },
+  {
+    name: 'Jana V.',
+    role: 'Sold Atlas Logistics',
+    rating: 5,
+    date: 'January 2026',
+    text: 'The verification process took two weeks but the listing score made a difference — I had three serious buyers within ten days of going premium.',
+  },
+  {
+    name: 'Daan B.',
+    role: 'Bought Lumen Group',
+    rating: 4,
+    date: 'November 2025',
+    text: 'Escrow + the structured handover were the deciding factors. The AI match shortlist was surprisingly accurate.',
+  },
+];
+
+export const PHASES: Phase[] = [
+  { title: 'LOI & Discovery', desc: 'NDA signed, books open, escrow funded.', ownership: 0 },
+  { title: 'Operating handover', desc: '6-month seller-led transition, KPIs locked.', ownership: 51 },
+  { title: 'Full ownership', desc: 'Final earn-out cleared, equity transferred.', ownership: 100 },
+];
+
+export const TEAM: TeamMember[] = [
+  { name: 'Sara El-Hassan', role: 'Co-founder & CEO', bio: '12 years in M&A. Previously: Rothschild, advisor on €1.2B+ in SMB transactions.' },
+  { name: 'Tomas Visser', role: 'Co-founder & CTO', bio: 'Built escrow infra at a fintech unicorn. Ex-Adyen.' },
+  { name: 'Imani Okonkwo', role: 'Head of Trust', bio: 'Former forensic auditor. Designs the verification framework.' },
+  { name: 'Jonas Ahlberg', role: 'Head of Marketplace', bio: 'Scaled marketplaces from 0 to liquidity at two prior startups.' },
+];
+
+export const MATCHES: Match[] = [
+  { listing: LISTINGS[0], fit: 94, reasons: ['Sector match: logistics', 'Revenue band fit', 'Buyer location overlap', 'Phased structure preferred'] },
+  { listing: LISTINGS[1], fit: 87, reasons: ['Margin profile match', 'Buyer experience: DTC', 'Within budget range'] },
+  { listing: LISTINGS[8], fit: 81, reasons: ['Recurring revenue model', 'Conservative growth profile', 'Mature ops team'] },
+];
+
+/** Match rating 1–100 for every verified listing (Ahmed AI results). */
+export type ScoredMatch = {
+  listing: Listing;
+  fit: number;
+  reasons: string[];
+};
+
+const DEFAULT_MATCH_REASONS = [
+  ['Sector alignment', 'Revenue band fit', 'Verified seller'],
+  ['Margin profile', 'Location overlap', 'Listing quality score'],
+  ['Operating model fit', 'Team size match', 'Growth profile'],
+];
+
+export function getAllScoredMatches(): ScoredMatch[] {
+  return LISTINGS.map((listing, i) => {
+    const known = MATCHES.find((m) => m.listing.id === listing.id);
+    const fit = known?.fit ?? Math.min(100, Math.max(1, listing.score - (i % 4) * 2));
+    const reasons =
+      known?.reasons ??
+      DEFAULT_MATCH_REASONS[i % DEFAULT_MATCH_REASONS.length];
+    return { listing, fit, reasons };
+  }).sort((a, b) => b.fit - a.fit);
+}
+
+export const SBS_DATA = { LISTINGS, SECTORS, REVENUE_RANGES, REVIEWS, PHASES, TEAM, MATCHES };
