@@ -49,7 +49,6 @@ export function SellerOnboardingPage() {
     if (form.phasedAccepted) s += 10;
     if (step >= steps.length - 1 && form.financialsUploaded) s += 5;
     return Math.min(100, s);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, step, steps.length]);
 
   const breakdown = [
