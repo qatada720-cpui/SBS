@@ -4,20 +4,33 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Icon, SectionEyebrow, Field } from '@/components/ui';
+import { createClient } from '@/lib/supabase-browser';
 
 export function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    setError('');
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      setError(error.message === 'Invalid login credentials'
+        ? 'Wrong email or password.'
+        : error.message);
       setLoading(false);
-      router.push('/dashboard');
-    }, 600);
+      return;
+    }
+
+    router.push('/dashboard');
+    router.refresh();
   }
 
   return (
@@ -44,7 +57,7 @@ export function SignInPage() {
                   autoComplete="email"
                 />
               </Field>
-              <Field label="Password" hint="Demo: any password works">
+              <Field label="Password">
                 <input
                   type="password"
                   value={password}
@@ -54,8 +67,15 @@ export function SignInPage() {
                   autoComplete="current-password"
                 />
               </Field>
+
+              {error && (
+                <div style={{ background: '#FF3B3011', border: '0.5px solid #FF3B3044', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#FF3B30' }}>
+                  {error}
+                </div>
+              )}
+
               <div className="row" style={{ justifyContent: 'flex-end' }}>
-                <Link href="/contact" className="muted" style={{ fontSize: 12 }}>
+                <Link href="/forgot-password" className="muted" style={{ fontSize: 12 }}>
                   Forgot password?
                 </Link>
               </div>
@@ -82,12 +102,8 @@ export function SignInPage() {
           </div>
 
           <div className="row gap-2" style={{ justifyContent: 'center', marginTop: 24, flexWrap: 'wrap' }}>
-            <span className="badge badge-verified">
-              <Icon.Lock size={10} /> Escrow protected
-            </span>
-            <span className="badge">
-              <Icon.Shield size={10} /> Buy & sell
-            </span>
+            <span className="badge badge-verified"><Icon.Lock size={10} /> Escrow protected</span>
+            <span className="badge"><Icon.Shield size={10} /> Buy & sell</span>
           </div>
         </div>
       </section>
@@ -97,20 +113,54 @@ export function SignInPage() {
 
 export function SignUpPage() {
   const router = useRouter();
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-  });
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    setError('');
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: {
+        data: { full_name: form.name },
+      },
+    });
+
+    if (error) {
+      setError(error.message);
       setLoading(false);
-      router.push('/dashboard');
-    }, 600);
+      return;
+    }
+
+    setDone(true);
+    setLoading(false);
+  }
+
+  if (done) {
+    return (
+      <div className="page-enter">
+        <section style={{ padding: '96px 0 80px' }}>
+          <div className="container col gap-6" style={{ maxWidth: 440, margin: '0 auto', alignItems: 'center', textAlign: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: '#00A86B18', display: 'grid', placeItems: 'center' }}>
+              <Icon.Check size={24} color="#00A86B" />
+            </div>
+            <div className="col gap-2">
+              <h2 style={{ fontSize: 28, fontWeight: 700 }}>Check your email</h2>
+              <p className="muted" style={{ fontSize: 15, lineHeight: 1.6 }}>
+                We sent a confirmation link to <strong>{form.email}</strong>. Click it to activate your account.
+              </p>
+            </div>
+            <Link href="/sign-in" className="btn btn-secondary">Back to sign in</Link>
+          </div>
+        </section>
+      </div>
+    );
   }
 
   return (
@@ -157,16 +207,17 @@ export function SignUpPage() {
                   autoComplete="new-password"
                 />
               </Field>
+
+              {error && (
+                <div style={{ background: '#FF3B3011', border: '0.5px solid #FF3B3044', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#FF3B30' }}>
+                  {error}
+                </div>
+              )}
+
               <p style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
                 By signing up you agree to our{' '}
-                <Link href="/contact" style={{ color: 'var(--subtle)' }}>
-                  Terms
-                </Link>{' '}
-                and{' '}
-                <Link href="/contact" style={{ color: 'var(--subtle)' }}>
-                  Privacy Policy
-                </Link>
-                .
+                <Link href="/contact" style={{ color: 'var(--subtle)' }}>Terms</Link>{' '}and{' '}
+                <Link href="/contact" style={{ color: 'var(--subtle)' }}>Privacy Policy</Link>.
               </p>
               <Button
                 variant="primary"
@@ -183,9 +234,7 @@ export function SignUpPage() {
             <div className="hair-t" style={{ paddingTop: 20, textAlign: 'center' }}>
               <span className="muted" style={{ fontSize: 13 }}>
                 Already have an account?{' '}
-                <Link href="/sign-in" style={{ color: 'var(--fg)', fontWeight: 500 }}>
-                  Sign in
-                </Link>
+                <Link href="/sign-in" style={{ color: 'var(--fg)', fontWeight: 500 }}>Sign in</Link>
               </span>
             </div>
           </div>

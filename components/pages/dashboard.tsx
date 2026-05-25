@@ -1,11 +1,57 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button, Icon, SectionEyebrow } from '@/components/ui';
 import { AccountTabs } from '@/components/layout/account-tabs';
-import { MATCHES, LISTINGS } from '@/lib/data';
+import { createClient } from '@/lib/supabase-browser';
+import type { User } from '@supabase/supabase-js';
 
 export function AccountDashboardPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<{ full_name: string | null; role: string } | null>(null);
+  const [listingCount, setListingCount] = useState(0);
+  const [conversationCount, setConversationCount] = useState(0);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/sign-in'); return; }
+      setUser(user);
+
+      const [{ data: prof }, { count: listings }, { count: convos }] = await Promise.all([
+        supabase.from('profiles').select('full_name, role').eq('id', user.id).single(),
+        supabase.from('listings').select('*', { count: 'exact', head: true }).eq('seller_id', user.id),
+        supabase.from('conversations').select('*', { count: 'exact', head: true })
+          .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`),
+      ]);
+
+      if (prof) setProfile(prof);
+      setListingCount(listings ?? 0);
+      setConversationCount(convos ?? 0);
+    }
+
+    load();
+  }, [router]);
+
+  async function signOut() {
+    setSigningOut(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/');
+    router.refresh();
+  }
+
+  const displayName = profile?.full_name
+    ?? user?.user_metadata?.full_name
+    ?? user?.email?.split('@')[0]
+    ?? 'there';
+
   return (
     <div className="page-enter">
       <section style={{ padding: '32px 0 0' }}>
@@ -13,12 +59,22 @@ export function AccountDashboardPage() {
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 16 }}>
             <div className="col gap-2">
               <SectionEyebrow>Your account</SectionEyebrow>
-              <h1 style={{ fontSize: 36 }}>Buy and sell from one place</h1>
+              <h1 style={{ fontSize: 36 }}>Hey, {displayName} 👋</h1>
               <p style={{ fontSize: 15, color: 'var(--subtle)', fontWeight: 300, maxWidth: 560 }}>
                 One account for everything — browse businesses, run AI matches, list your own company, and manage deals on both sides.
               </p>
             </div>
-            <AccountTabs />
+            <div className="row gap-2" style={{ alignItems: 'center' }}>
+              <AccountTabs />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={signOut}
+                disabled={signingOut}
+              >
+                {signingOut ? 'Signing out…' : 'Sign out'}
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -28,17 +84,7 @@ export function AccountDashboardPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
             <Link href="/buyer/dashboard" className="card col gap-4 card-hover" style={{ padding: 28, textDecoration: 'none' }}>
               <div className="row gap-3" style={{ alignItems: 'center' }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: 'var(--surface-2)',
-                    border: '0.5px solid var(--border)',
-                    display: 'grid',
-                    placeItems: 'center',
-                  }}
-                >
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--surface-2)', border: '0.5px solid var(--border)', display: 'grid', placeItems: 'center' }}>
                   <Icon.Search size={18} />
                 </div>
                 <div className="col gap-1">
@@ -49,15 +95,13 @@ export function AccountDashboardPage() {
               <div className="row" style={{ gap: 24, marginTop: 8 }}>
                 <div className="col gap-1">
                   <span className="tabular" style={{ fontSize: 28, fontWeight: 500, letterSpacing: -1 }}>
-                    {MATCHES.length}
+                    {conversationCount}
                   </span>
-                  <span className="muted" style={{ fontSize: 12 }}>AI matches</span>
+                  <span className="muted" style={{ fontSize: 12 }}>Active conversations</span>
                 </div>
                 <div className="col gap-1">
-                  <span className="tabular" style={{ fontSize: 28, fontWeight: 500, letterSpacing: -1 }}>
-                    3
-                  </span>
-                  <span className="muted" style={{ fontSize: 12 }}>Active deals</span>
+                  <span className="tabular" style={{ fontSize: 28, fontWeight: 500, letterSpacing: -1 }}>—</span>
+                  <span className="muted" style={{ fontSize: 12 }}>AI matches</span>
                 </div>
               </div>
               <span className="row gap-2" style={{ fontSize: 13, color: 'var(--blue)', marginTop: 4 }}>
@@ -67,17 +111,7 @@ export function AccountDashboardPage() {
 
             <Link href="/seller/dashboard" className="card col gap-4 card-hover" style={{ padding: 28, textDecoration: 'none' }}>
               <div className="row gap-3" style={{ alignItems: 'center' }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: 'var(--surface-2)',
-                    border: '0.5px solid var(--border)',
-                    display: 'grid',
-                    placeItems: 'center',
-                  }}
-                >
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--surface-2)', border: '0.5px solid var(--border)', display: 'grid', placeItems: 'center' }}>
                   <Icon.Building size={18} />
                 </div>
                 <div className="col gap-1">
@@ -88,15 +122,15 @@ export function AccountDashboardPage() {
               <div className="row" style={{ gap: 24, marginTop: 8 }}>
                 <div className="col gap-1">
                   <span className="tabular" style={{ fontSize: 28, fontWeight: 500, letterSpacing: -1 }}>
-                    92
+                    {listingCount}
                   </span>
-                  <span className="muted" style={{ fontSize: 12 }}>Listing score</span>
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {listingCount === 1 ? 'Listing' : 'Listings'}
+                  </span>
                 </div>
                 <div className="col gap-1">
-                  <span className="tabular" style={{ fontSize: 28, fontWeight: 500, letterSpacing: -1 }}>
-                    2
-                  </span>
-                  <span className="muted" style={{ fontSize: 12 }}>Buyer inquiries</span>
+                  <span className="tabular" style={{ fontSize: 28, fontWeight: 500, letterSpacing: -1 }}>{conversationCount}</span>
+                  <span className="muted" style={{ fontSize: 12 }}>Inquiries</span>
                 </div>
               </div>
               <span className="row gap-2" style={{ fontSize: 13, color: 'var(--blue)', marginTop: 4 }}>
@@ -108,37 +142,31 @@ export function AccountDashboardPage() {
           <div className="card row" style={{ padding: 24, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
             <div className="col gap-2">
               <span style={{ fontSize: 14, fontWeight: 500 }}>Ready to list a business?</span>
-              <span className="muted" style={{ fontSize: 13 }}>
-                Start seller onboarding — same account, no extra signup.
-              </span>
+              <span className="muted" style={{ fontSize: 13 }}>Start seller onboarding — same account, no extra signup.</span>
             </div>
             <Link href="/seller/onboarding">
-              <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />}>
-                List a business
-              </Button>
+              <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />}>List a business</Button>
             </Link>
           </div>
 
           <div className="col gap-3">
-            <span className="muted" style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 500 }}>
-              Quick actions
-            </span>
+            <span className="muted" style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 500 }}>Quick actions</span>
             <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
-              <Link href="/marketplace">
-                <Button variant="secondary" size="sm">
-                  Browse marketplace
-                </Button>
-              </Link>
-              <Link href="/">
-                <Button variant="secondary" size="sm">
-                  Chat with Ahmed AI
-                </Button>
-              </Link>
-              <Link href={`/listing/${LISTINGS[0].id}`}>
-                <Button variant="ghost" size="sm">
-                  View sample listing
-                </Button>
-              </Link>
+              <Link href="/marketplace"><Button variant="secondary" size="sm">Browse marketplace</Button></Link>
+              <Link href="/"><Button variant="secondary" size="sm">Chat with Ahmed AI</Button></Link>
+              <Link href="/messages"><Button variant="ghost" size="sm">Messages</Button></Link>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 20, background: 'var(--surface)' }}>
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div className="col gap-1">
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Signed in as</span>
+                <span className="muted" style={{ fontSize: 13 }}>{user?.email}</span>
+              </div>
+              <div className="row gap-2">
+                <span className="badge badge-verified"><Icon.Shield size={10} /> Verified account</span>
+              </div>
             </div>
           </div>
         </div>

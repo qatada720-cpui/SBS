@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Icon, VerifiedBadge, PremiumBadge, ScoreBar, PhaseTracker, ListingCard, SectionEyebrow } from '@/components/ui';
@@ -88,7 +88,20 @@ export function MarketplacePage() {
 
       <section style={{ padding: '40px 0 64px' }}>
         <div className="container">
-          {filtered.length === 0 ? (
+          {LISTINGS.length === 0 ? (
+            <div className="col" style={{ padding: '80px 0', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--surface)', border: '0.5px solid var(--hair)', display: 'grid', placeItems: 'center' }}>
+                <Icon.Building size={22} />
+              </div>
+              <div className="col gap-2">
+                <p style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>No listings yet</p>
+                <p className="muted" style={{ fontSize: 14, maxWidth: 380, margin: 0 }}>
+                  We're currently onboarding our first verified businesses. Are you a seller? List your business now and be first on the platform.
+                </p>
+              </div>
+              <Link href="/seller/onboarding" className="btn btn-primary">List your business</Link>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="col" style={{ padding: 80, alignItems: 'center', gap: 12 }}>
               <Icon.Search size={24} />
               <p className="muted">No listings match these filters.</p>
@@ -108,7 +121,18 @@ export function MarketplacePage() {
 }
 
 export function ListingPage({ listingId }: { listingId: string }) {
-  const listing = LISTINGS.find(l => l.id === listingId) || LISTINGS[0];
+  const listing = LISTINGS.find(l => l.id === listingId);
+  if (!listing) return (
+    <div className="page-enter">
+      <section style={{ padding: '80px 0', textAlign: 'center' }}>
+        <div className="container col gap-4" style={{ alignItems: 'center' }}>
+          <p style={{ fontSize: 18, fontWeight: 600 }}>Listing not found</p>
+          <p className="muted">This listing may have been removed or is no longer available.</p>
+          <Link href="/marketplace" className="btn btn-primary">Back to marketplace</Link>
+        </div>
+      </section>
+    </div>
+  );
   const [tab, setTab] = useState('overview');
   const [selectedPhoto, setSelectedPhoto] = useState(0);
 
@@ -408,7 +432,16 @@ export function ListingPage({ listingId }: { listingId: string }) {
 
 export function AIMatchPage() {
   const router = useRouter();
-  const scored = getAllScoredMatches();
+  const [scored, setScored] = useState<{ id: string; fit: number; reasons: string[]; listing: Record<string, unknown> }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('sbs_matches');
+      if (raw) setScored(JSON.parse(raw));
+    } catch {}
+    setLoaded(true);
+  }, []);
 
   return (
     <div className="page-enter">
@@ -429,23 +462,39 @@ export function AIMatchPage() {
 
       <section style={{ padding: '16px 0 80px' }}>
         <div className="container col gap-4">
-          {scored.map((m) => (
-            <div key={m.listing.id} className="card row" style={{ padding: 0, overflow: 'hidden' }}>
+          {loaded && scored.length === 0 && (
+            <div className="col" style={{ padding: '60px 0', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--surface)', border: '0.5px solid var(--hair)', display: 'grid', placeItems: 'center' }}>
+                <Icon.Sparkle size={22} />
+              </div>
+              <div className="col gap-2">
+                <p style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>No matches yet</p>
+                <p className="muted" style={{ fontSize: 14, maxWidth: 400, margin: 0 }}>
+                  We're onboarding our first verified listings. The more sellers list, the more specific your AI matches become.
+                </p>
+              </div>
+              <Link href="/" className="btn btn-primary">Back to Ahmed AI</Link>
+            </div>
+          )}
+          {scored.map((m) => {
+            const l = m.listing as Record<string, unknown>;
+            return (
+            <div key={m.id} className="card row" style={{ padding: 0, overflow: 'hidden' }}>
               <div className="img-ph" style={{ width: 220, minHeight: 180, borderRadius: 0, borderRight: '0.5px solid var(--border)' }} />
               <div className="col gap-4" style={{ flex: 1, padding: 28 }}>
                 <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
                   <div className="col gap-2">
                     <div className="row gap-2">
-                      {m.listing.verified && <VerifiedBadge />}
-                      {m.listing.premium && <PremiumBadge />}
+                      {Boolean(l.verified) && <VerifiedBadge />}
+                      {Boolean(l.premium) && <PremiumBadge />}
                     </div>
-                    <h3>{m.listing.name}</h3>
+                    <h3>{String(l.name ?? '')}</h3>
                     <div className="row gap-2 muted" style={{ fontSize: 12, flexWrap: 'wrap' }}>
-                      <span>{m.listing.sector}</span>
+                      <span>{String(l.sector ?? '')}</span>
                       <Icon.Dot size={3} />
-                      <span>{m.listing.location}</span>
+                      <span>{String(l.location ?? '')}</span>
                       <Icon.Dot size={3} />
-                      <span>{m.listing.revenue}</span>
+                      <span>€{Number(l.revenue ?? 0).toLocaleString()}</span>
                     </div>
                   </div>
                   <div className="col" style={{ alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
@@ -461,7 +510,7 @@ export function AIMatchPage() {
                       {m.fit}
                     </div>
                     <span className="muted" style={{ fontSize: 12 }}>match score / 100</span>
-                    <span className="muted" style={{ fontSize: 11 }}>Asking {m.listing.asking}</span>
+                    <span className="muted" style={{ fontSize: 11 }}>Asking €{Number(l.asking_price ?? 0).toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -487,18 +536,17 @@ export function AIMatchPage() {
                 </div>
 
                 <div className="row gap-2" style={{ marginTop: 4 }}>
-                  <Link href={`/listing/${m.listing.id}`}>
+                  <Link href={`/listing/${String(l.id ?? '')}`}>
                     <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />}>
                       View listing
                     </Button>
                   </Link>
-                  <Button variant="secondary" size="sm">
-                    Save
-                  </Button>
+                  <Button variant="secondary" size="sm">Save</Button>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
 
           <div className="row hair" style={{ padding: 20, borderRadius: 10, justifyContent: 'space-between', alignItems: 'center', marginTop: 16, flexWrap: 'wrap', gap: 12 }}>
             <span style={{ fontSize: 13, color: 'var(--subtle)' }}>Want to refine your answers?</span>

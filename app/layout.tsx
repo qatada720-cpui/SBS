@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'SafeBusinessSelling — Safely buy & sell businesses',
+  title: 'SafeBusineSSSelling — Safely buy & sell businesses',
   description: 'A premium B2B marketplace where entrepreneurs safely buy and sell businesses.',
 };
 

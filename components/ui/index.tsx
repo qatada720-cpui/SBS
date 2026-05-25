@@ -7,13 +7,13 @@ export function Logo({ size = 1, showWordmark = true }: { size?: number; showWor
   const w = 200 * size;
   const h = 48 * size;
   return (
-    <svg width={w} height={h} viewBox="0 0 200 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="SafeBusinessSelling">
+    <svg width={w} height={h} viewBox="0 0 216 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="SafeBusineSSSelling">
       <rect x="0" y="20" width="36" height="8" rx="4" fill="#0047FF" />
       <rect x="0" y="8" width="24" height="8" rx="4" fill="#0047FF" opacity="0.5" />
       <rect x="12" y="32" width="24" height="8" rx="4" fill="#0047FF" opacity="0.5" />
       {showWordmark && (
         <text x="48" y="30" fontFamily="var(--font-inter), Inter, sans-serif" fontSize="16" fontWeight="500" fill="currentColor" letterSpacing="-0.3">
-          SafeBusinessSelling
+          SafeBusineSSSelling
         </text>
       )}
     </svg>

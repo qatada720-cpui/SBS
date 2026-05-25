@@ -86,7 +86,7 @@ export function Footer() {
         </div>
 
         <div className="hair-t row" style={{ paddingTop: 24, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>© 2026 SafeBusinessSelling B.V. KvK 81234567. Amsterdam, NL.</span>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>© 2026 SafeBusineSSSelling B.V. KvK 81234567. Amsterdam, NL.</span>
           <span style={{ fontSize: 12, color: 'var(--muted)' }} className="row gap-2">
             <Icon.Dot size={5} color="#00A86B" /> All systems operational
           </span>
