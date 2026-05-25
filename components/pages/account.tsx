@@ -49,7 +49,8 @@ export function SellerOnboardingPage() {
     if (form.phasedAccepted) s += 10;
     if (step >= steps.length - 1 && form.financialsUploaded) s += 5;
     return Math.min(100, s);
-  }, [form, step]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, step, steps.length]);
 
   const breakdown = [
     { label: 'Business basics complete', weight: 15, done: !!(form.name && form.sector && form.location) },

@@ -97,7 +97,6 @@ export function MessagingPage() {
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, activeId]);
 
   useEffect(() => {
