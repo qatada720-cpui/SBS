@@ -81,10 +81,6 @@ const MOCK_CONVOS: Conversation[] = [
   },
 ];
 
-function formatTime(ts: string) {
-  return ts;
-}
-
 export function MessagingPage() {
   const [convos] = useState<Conversation[]>(MOCK_CONVOS);
   const [activeId, setActiveId] = useState<string>(MOCK_CONVOS[0].id);
@@ -101,7 +97,8 @@ export function MessagingPage() {
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [activeMessages, activeId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, activeId]);
 
   useEffect(() => {
     const ta = textareaRef.current;

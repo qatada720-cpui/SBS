@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+// useRouter only used in SignInPage
 import { Button, Icon, SectionEyebrow, Field } from '@/components/ui';
 import { createClient } from '@/lib/supabase-browser';
 
@@ -112,7 +113,6 @@ export function SignInPage() {
 }
 
 export function SignUpPage() {
-  const router = useRouter();
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

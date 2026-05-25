@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Icon, VerifiedBadge, PremiumBadge, ScoreBar, PhaseTracker, ListingCard, SectionEyebrow } from '@/components/ui';
-import { LISTINGS, SECTORS, REVENUE_RANGES, PHASES, REVIEWS, getAllScoredMatches } from '@/lib/data';
+import { LISTINGS, SECTORS, REVENUE_RANGES, PHASES, REVIEWS } from '@/lib/data';
 
 export function MarketplacePage() {
   const [sector, setSector] = useState('All sectors');
@@ -122,6 +122,8 @@ export function MarketplacePage() {
 
 export function ListingPage({ listingId }: { listingId: string }) {
   const listing = LISTINGS.find(l => l.id === listingId);
+  const [tab, setTab] = useState('overview');
+
   if (!listing) return (
     <div className="page-enter">
       <section style={{ padding: '80px 0', textAlign: 'center' }}>
@@ -133,8 +135,6 @@ export function ListingPage({ listingId }: { listingId: string }) {
       </section>
     </div>
   );
-  const [tab, setTab] = useState('overview');
-  const [selectedPhoto, setSelectedPhoto] = useState(0);
 
   const breakdown = [
     { label: 'Identity & ownership verified', weight: 15, done: true },

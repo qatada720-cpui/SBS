@@ -1,153 +1,10 @@
 'use client';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Button, Icon, VerifiedBadge, ScoreBar, PhaseTracker, ListingCard, SectionEyebrow, Stat, Field } from '@/components/ui';
+import { Button, Icon, SectionEyebrow, Stat, Field } from '@/components/ui';
 import { TEAM } from '@/lib/data';
 
-const AHMED_OPENING =
-  "What kind of business are you looking to buy?";
-
-type ChatQuestion = {
-  bot: string;
-  placeholder?: string;
-  quickReplies?: string[];
-  acknowledge: (answer: string) => string;
-};
-
-// Quick reply suggestions per turn (Ahmed's real response comes from Groq)
-const QUICK_REPLIES_BY_TURN: string[][] = [
-  ['SaaS / software', 'E-commerce', 'Logistics', 'Professional services', 'Healthcare'],
-  ['Under €500K', '€500K – €1M', '€1M – €3M', '€3M – €10M', '€10M+'],
-  ['Netherlands', 'BeNeLux', 'DACH region', 'EU-wide', 'Remote — anywhere'],
-  ['Full-time operator', 'Phased over 6–12 months', 'Strategic / board only', 'Financial investor'],
-  ['Within 90 days', '3 – 6 months', '6 – 12 months', 'No rush'],
-  ['Recurring revenue only', 'Min €100K EBITDA', 'Owner stays 12+ months', 'B2B only', 'No restaurants'],
-  ['Same sector experience', 'Adjacent industry', 'M&A / investor background', 'First-time buyer'],
-  ['Yes — strongly prefer phased', 'Open to it', 'Prefer clean break'],
-  ['15%+', '20%+', '25%+', 'Flexible on margin'],
-  ['No restaurants', 'No brick-and-mortar retail', 'No manufacturing', 'Open to everything'],
-];
-
-const QUESTION_POOL: ChatQuestion[] = [
-  {
-    bot: "What's your total budget for this acquisition — including working capital?",
-    quickReplies: ['Under €500K', '€500K – €1M', '€1M – €3M', '€3M – €10M', '€10M+'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('500') && a.toLowerCase().includes('under')) return `Good starting point. At that range we have solid verified listings, mostly in services, e-commerce, and niche B2B.`;
-      if (a.toLowerCase().includes('1m') || a.toLowerCase().includes('1 m') || a === '€500K – €1M') return `Solid budget. That unlocks a good range of profitable SMEs on our platform.`;
-      if (a.toLowerCase().includes('3m') || a.toLowerCase().includes('10m') || a.toLowerCase().includes('5m')) return `Strong position. At that level you have access to our premium verified deals with full data rooms.`;
-      return `Good to know. That budget gives you a clear target range to work with.`;
-    },
-    placeholder: 'e.g. €800K total including working capital',
-  },
-  {
-    bot: 'Where should the business be based? You can be specific (city) or broad (EU-wide, remote-friendly).',
-    quickReplies: ['Netherlands', 'BeNeLux', 'DACH region', 'EU-wide', 'Remote — location doesn\'t matter'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('remote')) return `Remote-friendly businesses open up a lot more options — we have listings across 12 EU countries that can be managed remotely.`;
-      if (a.toLowerCase().includes('netherlands') || a.toLowerCase().includes('nl')) return `Great — we have a strong deal flow in the Netherlands, especially in logistics, SaaS, and professional services.`;
-      return `Noted on location. That helps narrow things down significantly.`;
-    },
-    placeholder: 'e.g. Within 2h of Amsterdam, anywhere in BeNeLux…',
-  },
-  {
-    bot: 'How hands-on do you want to be after closing? Are you stepping in as operator, or staying strategic?',
-    quickReplies: ['Full-time CEO from day one', 'Phased in over 6–12 months', 'Strategic / board level only', 'Financial investor only'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('ceo') || a.toLowerCase().includes('full')) return `Operator mindset — that's actually a strong signal for sellers. Businesses with hands-on buyers close faster and integrate better.`;
-      if (a.toLowerCase().includes('phased') || a.toLowerCase().includes('6')) return `Smart approach. A phased handover is what we recommend for most deals — it reduces risk for both sides.`;
-      if (a.toLowerCase().includes('strategic') || a.toLowerCase().includes('board')) return `Strategic buyers work well for established businesses with a strong management team already in place.`;
-      return `Got it — that tells me what kind of operational setup to prioritize in your matches.`;
-    },
-  },
-  {
-    bot: 'What\'s your ideal timeline to close a deal?',
-    quickReplies: ['ASAP — within 90 days', '3 – 6 months', '6 – 12 months', 'No rush — right deal only'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('90') || a.toLowerCase().includes('asap')) return `Understood — we'll focus on listings where due diligence is already partly done and the seller is motivated to move.`;
-      if (a.toLowerCase().includes('6') || a.toLowerCase().includes('12')) return `That's a realistic window. It gives time for proper due diligence without rushing.`;
-      return `Good — knowing your timeline helps us filter for sellers whose expectations align.`;
-    },
-  },
-  {
-    bot: 'Any must-haves or hard deal-breakers I should know about? Revenue model, EBITDA floor, team size, or anything else.',
-    quickReplies: ['Recurring revenue only (SaaS/subscriptions)', 'Minimum €100K EBITDA', 'Owner must stay 12+ months', 'No real-estate-heavy assets', 'B2B customers only'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('recurring') || a.toLowerCase().includes('saas')) return `Recurring revenue is a great filter — it dramatically reduces post-acquisition revenue risk.`;
-      if (a.toLowerCase().includes('ebitda')) return `Smart floor to set. EBITDA discipline early saves a lot of time on deals that look good on revenue but have margin problems.`;
-      if (a.toLowerCase().includes('owner') || a.toLowerCase().includes('stay')) return `Seller retention is a big one — we specifically flag listings where the founder has committed to a handover period.`;
-      return `Noted. Those filters will help surface the right deals and skip the ones that would waste your time.`;
-    },
-    placeholder: 'e.g. Recurring revenue, €100K+ EBITDA, owner stays on…',
-  },
-  {
-    bot: 'What experience are you bringing to the table as a buyer?',
-    quickReplies: ['Operated a business in the same sector', 'Adjacent industry experience', 'Investor / M&A background', 'First-time buyer'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('same') || a.toLowerCase().includes('sector')) return `Sector experience is a huge advantage — sellers trust buyers who already speak the language of the business.`;
-      if (a.toLowerCase().includes('investor') || a.toLowerCase().includes('m&a')) return `M&A experience is exactly what sellers with complex cap tables and earnout structures want to see.`;
-      if (a.toLowerCase().includes('first')) return `No problem at all — many of our best deals go to first-time buyers. That's why we have deal coordinators and verified advisors built into the process.`;
-      return `Good background. That context will be visible to sellers when you reach out, which builds trust early.`;
-    },
-  },
-  {
-    bot: 'Would you consider a business that needs some operational improvement, or do you want something already running smoothly?',
-    quickReplies: ['Running smoothly — low risk', 'Some upside potential is fine', 'I want a turnaround opportunity', 'Flexible depending on price'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('smooth') || a.toLowerCase().includes('low risk')) return `Smart. Clean operations reduce your post-acquisition risk significantly and speed up the handover.`;
-      if (a.toLowerCase().includes('upside') || a.toLowerCase().includes('improvement')) return `Noted — there are businesses with clear untapped levers (pricing, distribution, digital) that match this profile.`;
-      if (a.toLowerCase().includes('turnaround')) return `Turnarounds can deliver strong returns but require operational hands-on involvement. Good to know that's on the table.`;
-      return `That flexibility actually helps — it opens up more listings across different quality tiers.`;
-    },
-  },
-  {
-    bot: 'How important is it that the seller stays involved after closing? (e.g. consulting, advisory, or earnout period)',
-    quickReplies: ['Critical — I need 12+ months handover', 'Helpful but not required', 'Prefer clean break', 'Depends on the business'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('12') || a.toLowerCase().includes('critical')) return `That's a strong signal to include in your profile. Sellers who offer long handovers tend to have well-documented businesses.`;
-      if (a.toLowerCase().includes('clean') || a.toLowerCase().includes('break')) return `Understood. We'll filter for businesses where the operations don't depend on the current owner being present.`;
-      return `Good to know — we can flag listings based on the seller's stated transition preferences.`;
-    },
-  },
-  {
-    bot: 'Do you have financing lined up, or are you still exploring options?',
-    quickReplies: ['Cash buyer — ready now', 'Bank financing arranged', 'SBA / business loan planned', 'Still exploring financing'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('cash')) return `Cash buyers have a real edge — sellers take you more seriously and deals close faster without financing contingencies.`;
-      if (a.toLowerCase().includes('bank') || a.toLowerCase().includes('arranged')) return `Bank financing already arranged is a strong position. Sellers appreciate buyers who aren't dependent on deal-specific approval.`;
-      if (a.toLowerCase().includes('exploring')) return `No problem — we can connect you with business acquisition financing specialists through the platform.`;
-      return `Good to know your financing position. It affects which deal structures work best for you.`;
-    },
-  },
-  {
-    bot: 'What minimum EBITDA margin are you looking for? This filters out thin-margin businesses early.',
-    quickReplies: ['15%+', '20%+', '25%+', 'Flexible — revenue growth matters more'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('25')) return `25%+ EBITDA margin is a high bar — but there are listings that hit it, mostly in SaaS, professional services, and niche B2B.`;
-      if (a.toLowerCase().includes('20')) return `20%+ is a solid filter. It eliminates most thin-margin retail and hospitality, which is often wise for a first acquisition.`;
-      if (a.toLowerCase().includes('15')) return `15% is realistic for most sectors. It keeps your options open without accepting cash-hungry businesses.`;
-      return `Noted on margin flexibility. Revenue growth can absolutely justify a lower current margin in the right case.`;
-    },
-  },
-  {
-    bot: 'Are there specific sectors you want to avoid entirely?',
-    quickReplies: ['No restaurants / hospitality', 'No retail / brick-and-mortar', 'No manufacturing / heavy assets', 'No — open to everything'],
-    acknowledge: (a) => {
-      if (a.toLowerCase().includes('restaurant') || a.toLowerCase().includes('hospitality')) return `Good call for many buyers — hospitality is operationally demanding and margin-thin. We'll filter those out.`;
-      if (a.toLowerCase().includes('retail') || a.toLowerCase().includes('brick')) return `Brick-and-mortar retail has structural headwinds. Noted — we'll deprioritize those listings for you.`;
-      if (a.toLowerCase().includes('manufacturing')) return `Manufacturing often comes with asset-heavy balance sheets and capex intensity. Removing it keeps your shortlist leaner.`;
-      return `Open to everything is fine — it means the scoring will be purely based on financials and fit.`;
-    },
-    placeholder: 'e.g. No restaurants, nothing with heavy inventory…',
-  },
-];
-
-function generateAcknowledgment(answer: string, questionIndex: number): string {
-  const q = QUESTION_POOL[questionIndex % QUESTION_POOL.length];
-  if (q?.acknowledge) return q.acknowledge(answer);
-  return 'Got it.';
-}
+const AHMED_OPENING = "What kind of business are you looking to buy?";
 
 type ChatMessage = {
   from: string;
@@ -163,14 +20,12 @@ export function HomePage() {
     { from: 'bot', text: AHMED_OPENING },
   ]);
   const [groqHistory, setGroqHistory] = useState<GroqMessage[]>([]);
-  const [turnIndex, setTurnIndex] = useState(0);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [navigating, setNavigating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const quickReplies = QUICK_REPLIES_BY_TURN[turnIndex % QUICK_REPLIES_BY_TURN.length];
   const userAnswerCount = messages.filter((m) => m.from === 'user').length;
 
   useEffect(() => {
@@ -209,7 +64,6 @@ export function HomePage() {
 
       setGroqHistory([...newHistory, { role: 'assistant', content: reply }]);
       setMessages((m) => [...m, { from: 'bot', text: reply }]);
-      setTurnIndex((i) => i + 1);
     } catch {
       setMessages((m) => [...m, { from: 'bot', text: "Sorry, something went wrong. Please try again." }]);
     } finally {
