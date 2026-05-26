@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Icon, SectionEyebrow, Stat, Field } from '@/components/ui';
 import { TEAM } from '@/lib/data';
@@ -22,6 +22,7 @@ export function HomePage() {
   const [groqHistory, setGroqHistory] = useState<GroqMessage[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
+  const [, startTransition] = useTransition();
   const [navigating, setNavigating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -77,16 +78,18 @@ export function HomePage() {
         fullText += decoder.decode(value, { stream: true });
       }
 
-      // Typewriter: render one character at a time
-      for (const char of fullText) {
-        displayed += char;
+      // Typewriter: batch 4 chars per tick, low priority so typing stays responsive
+      for (let i = 0; i < fullText.length; i += 4) {
+        displayed += fullText.slice(i, i + 4);
         const snap = displayed;
-        setMessages((m) => {
-          const updated = [...m];
-          updated[updated.length - 1] = { from: 'bot', text: snap };
-          return updated;
+        startTransition(() => {
+          setMessages((m) => {
+            const updated = [...m];
+            updated[updated.length - 1] = { from: 'bot', text: snap };
+            return updated;
+          });
         });
-        await new Promise((r) => setTimeout(r, 18));
+        await new Promise((r) => setTimeout(r, 30));
       }
 
       setGroqHistory([...newHistory, { role: 'assistant', content: fullText }]);
