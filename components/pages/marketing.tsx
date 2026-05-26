@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useTransition } from 'react';
+import { useState, useEffect, useRef, useTransition, useCallback, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Icon, SectionEyebrow, Stat, Field } from '@/components/ui';
 import { TEAM } from '@/lib/data';
@@ -20,33 +20,20 @@ export function HomePage() {
     { from: 'bot', text: AHMED_OPENING },
   ]);
   const [groqHistory, setGroqHistory] = useState<GroqMessage[]>([]);
-  const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [, startTransition] = useTransition();
   const [navigating, setNavigating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const userAnswerCount = messages.filter((m) => m.from === 'user').length;
-
-  useEffect(() => {
-    const ta = textareaRef.current;
-    if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; }
-  }, [input]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages, thinking]);
 
-  useEffect(() => { if (!navigating) textareaRef.current?.focus(); }, [thinking, navigating]);
-
-  async function sendAnswer(text: string) {
-    if (!text?.trim() || thinking || navigating) return;
-
-    const trimmed = text.trim();
+  const sendAnswer = useCallback(async (trimmed: string) => {
     setMessages((m) => [...m, { from: 'user', text: trimmed }]);
-    setInput('');
     setThinking(true);
 
     const newHistory: GroqMessage[] = [
@@ -71,7 +58,6 @@ export function HomePage() {
       setThinking(false);
       setMessages((m) => [...m, { from: 'bot', text: '' }]);
 
-      // Collect all streamed text
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -97,9 +83,9 @@ export function HomePage() {
       setThinking(false);
       setMessages((m) => [...m, { from: 'bot', text: "Sorry, something went wrong. Please try again." }]);
     }
-  }
+  }, [groqHistory, startTransition]);
 
-  async function showMatchingBusinesses() {
+  const showMatchingBusinesses = useCallback(async () => {
     if (navigating || thinking) return;
     setNavigating(true);
     setMessages((m) => [
@@ -121,14 +107,7 @@ export function HomePage() {
     }
 
     router.push('/ai-match');
-  }
-
-  function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendAnswer(input);
-    }
-  }
+  }, [navigating, thinking, groqHistory, router]);
 
   return (
     <div className="page-enter" style={{ minHeight: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
@@ -161,7 +140,6 @@ export function HomePage() {
       {/* Bottom composer */}
       <div style={{ padding: '8px 24px 32px', display: 'flex', justifyContent: 'center', background: 'linear-gradient(to top, var(--bg) 60%, transparent)' }}>
         <div className="col gap-3" style={{ width: '100%', maxWidth: 680 }}>
-          {/* Stop when ready — always available */}
           {!navigating && (
             <button
               type="button"
@@ -174,45 +152,13 @@ export function HomePage() {
             </button>
           )}
 
-
-          {/* Composer */}
           {!navigating ? (
-            <div className={`prompt-box ${input.trim() ? 'has-value' : ''}`} style={{ width: '100%', border: '0.5px solid var(--border-strong)', borderRadius: 14, background: 'var(--surface)' }}>
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Type your answer…"
-                rows={1}
-                className="prompt-input"
-                style={{
-                  border: 'none', outline: 'none', background: 'transparent',
-                  padding: '14px 16px 0', fontSize: 15, lineHeight: 1.5, fontWeight: 300,
-                  resize: 'none', minHeight: 24, width: '100%', fontFamily: 'inherit',
-                  color: 'var(--fg)',
-                }}
-              />
-              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '8px 8px 8px 16px' }}>
-                <span className="muted" style={{ fontSize: 11 }}>
-                  {userAnswerCount > 0 ? `Answered ${userAnswerCount} · ` : ''}↵ to send · stop anytime above
-                </span>
-                <button
-                  onClick={() => sendAnswer(input)}
-                  disabled={!input.trim()}
-                  aria-label="Send"
-                  style={{
-                    width: 32, height: 32, borderRadius: 8,
-                    background: input.trim() ? 'var(--blue)' : 'var(--surface-2)',
-                    color: input.trim() ? '#FFFFFF' : 'var(--muted)',
-                    display: 'grid', placeItems: 'center',
-                    cursor: input.trim() ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  <Icon.Arrow size={13} />
-                </button>
-              </div>
-            </div>
+            <Composer
+              onSend={sendAnswer}
+              disabled={thinking}
+              answerCount={userAnswerCount}
+              shouldFocus={!thinking}
+            />
           ) : (
             <div className="row hair" style={{ padding: 14, borderRadius: 12, alignItems: 'center', gap: 10, justifyContent: 'center', background: 'var(--surface)' }}>
               <span className="spin" style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid var(--border-strong)', borderTopColor: 'var(--fg)', display: 'inline-block' }} />
@@ -235,6 +181,83 @@ export function HomePage() {
     </div>
   );
 }
+
+const Composer = memo(function Composer({
+  onSend,
+  disabled,
+  answerCount,
+  shouldFocus,
+}: {
+  onSend: (text: string) => void;
+  disabled: boolean;
+  answerCount: number;
+  shouldFocus: boolean;
+}) {
+  const [input, setInput] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; }
+  }, [input]);
+
+  useEffect(() => {
+    if (shouldFocus) textareaRef.current?.focus();
+  }, [shouldFocus]);
+
+  function send() {
+    const trimmed = input.trim();
+    if (!trimmed || disabled) return;
+    setInput('');
+    onSend(trimmed);
+  }
+
+  function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  }
+
+  return (
+    <div className={`prompt-box ${input.trim() ? 'has-value' : ''}`} style={{ width: '100%', border: '0.5px solid var(--border-strong)', borderRadius: 14, background: 'var(--surface)' }}>
+      <textarea
+        ref={textareaRef}
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={handleKey}
+        placeholder="Type your answer…"
+        rows={1}
+        className="prompt-input"
+        style={{
+          border: 'none', outline: 'none', background: 'transparent',
+          padding: '14px 16px 0', fontSize: 15, lineHeight: 1.5, fontWeight: 300,
+          resize: 'none', minHeight: 24, width: '100%', fontFamily: 'inherit',
+          color: 'var(--fg)',
+        }}
+      />
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '8px 8px 8px 16px' }}>
+        <span className="muted" style={{ fontSize: 11 }}>
+          {answerCount > 0 ? `Answered ${answerCount} · ` : ''}↵ to send · stop anytime above
+        </span>
+        <button
+          onClick={send}
+          disabled={!input.trim()}
+          aria-label="Send"
+          style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: input.trim() ? 'var(--blue)' : 'var(--surface-2)',
+            color: input.trim() ? '#FFFFFF' : 'var(--muted)',
+            display: 'grid', placeItems: 'center',
+            cursor: input.trim() ? 'pointer' : 'not-allowed',
+          }}
+        >
+          <Icon.Arrow size={13} />
+        </button>
+      </div>
+    </div>
+  );
+});
 
 function Message({ msg }: { msg: ChatMessage }) {
   if (msg.from === 'bot') {
