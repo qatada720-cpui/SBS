@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Icon, SectionEyebrow, Stat, Field } from '@/components/ui';
 import { TEAM } from '@/lib/data';
 
-const AHMED_OPENING = "What kind of business are you looking to buy?";
+const AHMED_OPENING = "I'm Ahmed — I help buyers find verified businesses on SafeBusinessSelling. To find your best matches, I'll ask a few short questions. What sector or type of business are you looking at?";
 
 type ChatMessage = {
   from: string;
@@ -59,15 +59,31 @@ export function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newHistory }),
       });
-      const data = await res.json();
-      const reply = data.reply as string;
 
-      setGroqHistory([...newHistory, { role: 'assistant', content: reply }]);
-      setMessages((m) => [...m, { from: 'bot', text: reply }]);
-    } catch {
-      setMessages((m) => [...m, { from: 'bot', text: "Sorry, something went wrong. Please try again." }]);
-    } finally {
+      if (!res.ok || !res.body) throw new Error('Request failed');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+
       setThinking(false);
+      setMessages((m) => [...m, { from: 'bot', text: '' }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+        setMessages((m) => {
+          const updated = [...m];
+          updated[updated.length - 1] = { from: 'bot', text: fullText };
+          return updated;
+        });
+      }
+
+      setGroqHistory([...newHistory, { role: 'assistant', content: fullText }]);
+    } catch {
+      setThinking(false);
+      setMessages((m) => [...m, { from: 'bot', text: "Sorry, something went wrong. Please try again." }]);
     }
   }
 
