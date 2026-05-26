@@ -65,19 +65,28 @@ export function HomePage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let fullText = '';
+      let displayed = '';
 
       setThinking(false);
       setMessages((m) => [...m, { from: 'bot', text: '' }]);
 
+      // Collect all streamed text
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
+      }
+
+      // Typewriter: render one character at a time
+      for (const char of fullText) {
+        displayed += char;
+        const snap = displayed;
         setMessages((m) => {
           const updated = [...m];
-          updated[updated.length - 1] = { from: 'bot', text: fullText };
+          updated[updated.length - 1] = { from: 'bot', text: snap };
           return updated;
         });
+        await new Promise((r) => setTimeout(r, 18));
       }
 
       setGroqHistory([...newHistory, { role: 'assistant', content: fullText }]);
