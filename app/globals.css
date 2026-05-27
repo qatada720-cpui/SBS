@@ -367,3 +367,23 @@ input:focus, textarea:focus, select:focus {
   50% { opacity: 1; }
 }
 .pulse { animation: pulse-soft 1.4s ease-in-out infinite; }
+
+/* ─── Mobile (≤ 767 px) ─── */
+@media (max-width: 767px) {
+  h1 { font-size: 36px; letter-spacing: -1px; }
+  h2 { font-size: 26px; letter-spacing: -0.6px; }
+
+  .container,
+  .container-narrow { padding: 0 16px; }
+
+  .section    { padding: 56px 0; }
+  .section-sm { padding: 40px 0; }
+
+  .stat-num { font-size: 40px; letter-spacing: -1.5px; }
+
+  .mobile-col  { flex-direction: column !important; align-items: flex-start !important; }
+  .mobile-wrap { flex-wrap: wrap !important; }
+  .mobile-full { width: 100% !important; min-width: unset !important; max-width: 100% !important; flex: unset !important; }
+  .mobile-grid-1 { grid-template-columns: 1fr !important; }
+  .mobile-grid-2 { grid-template-columns: repeat(2, 1fr) !important; }
+}

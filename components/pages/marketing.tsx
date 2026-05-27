@@ -360,8 +360,8 @@ export function HowItWorksPage() {
         <div className="container">
           <div className="col">
             {steps.map((s, i) => (
-              <div key={s.n} className="row" style={{ alignItems: 'flex-start', gap: 48, padding: '40px 0', borderTop: i === 0 ? 'none' : '0.5px solid var(--border)' }}>
-                <div className="row gap-4" style={{ minWidth: 280, alignItems: 'flex-start' }}>
+              <div key={s.n} className="row mobile-col" style={{ alignItems: 'flex-start', gap: 48, padding: '40px 0', borderTop: i === 0 ? 'none' : '0.5px solid var(--border)' }}>
+                <div className="row gap-4 mobile-full" style={{ minWidth: 280, alignItems: 'flex-start' }}>
                   <span className="tabular muted" style={{ fontSize: 13, fontWeight: 500, minWidth: 24 }}>{s.n}</span>
                   <h3 style={{ fontSize: 22 }}>{s.t}</h3>
                 </div>
@@ -379,7 +379,7 @@ export function HowItWorksPage() {
             <SectionEyebrow>Fees</SectionEyebrow>
             <h2>Simple, percentage-based, no monthly cost.</h2>
           </div>
-          <div className="row" style={{ gap: 16, alignItems: 'stretch' }}>
+          <div className="row mobile-wrap" style={{ gap: 16, alignItems: 'stretch' }}>
             {[
               { p: 'Buyer', tag: '1.5%', sub: 'of transaction value', f: ['AI match access', 'NDA + data room', 'Deal coordinator', 'Escrow protection', 'Phased ownership contract'] },
               { p: 'Seller', tag: '4%', sub: 'on close only', f: ['Verified listing', 'AI-generated copy', 'Buyer screening', 'Deal coordinator', 'Handover playbook'], featured: true },
@@ -433,8 +433,8 @@ export function AboutPage() {
       </section>
 
       <section className="section">
-        <div className="container row" style={{ alignItems: 'flex-start', gap: 80 }}>
-          <div style={{ flex: '0 0 280px' }}>
+        <div className="container row mobile-wrap" style={{ alignItems: 'flex-start', gap: 80 }}>
+          <div className="mobile-full" style={{ flex: '0 0 280px' }}>
             <SectionEyebrow>Mission</SectionEyebrow>
           </div>
           <div className="col gap-4" style={{ flex: 1, maxWidth: 720 }}>
@@ -452,7 +452,7 @@ export function AboutPage() {
             <SectionEyebrow>Team</SectionEyebrow>
             <h2>Operators, auditors, and engineers.</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
+          <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
             {TEAM.map(p => (
               <div key={p.name} className="col gap-4">
                 <div className="img-ph" style={{ aspectRatio: '4/5', borderRadius: 8 }} />
@@ -473,7 +473,7 @@ export function AboutPage() {
             <SectionEyebrow>Safety stats</SectionEyebrow>
             <h2 style={{ fontSize: 32 }}>The numbers behind "safely."</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0, border: '0.5px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+          <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0, border: '0.5px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
             {[
               { v: '7-step', l: 'Verification process', d: 'Identity, ownership, financials, tax filings, trade refs, sector compliance, beneficial owners.' },
               { v: '€10M', l: 'Escrow capacity', d: 'Funds held by a regulated trustee. Released only on milestone trigger.' },

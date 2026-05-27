@@ -32,10 +32,10 @@ export function MarketplacePage() {
       <section style={{ padding: '56px 0 32px' }}>
         <div className="container col gap-3">
           <SectionEyebrow>Marketplace</SectionEyebrow>
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end', gap: 24 }}>
+          <div className="row mobile-wrap" style={{ justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
             <h1 style={{ fontSize: 48 }}>{filtered.length} verified businesses</h1>
-            <div className="row gap-3">
-              <div className="row hair" style={{ padding: '0 12px', height: 36, borderRadius: 8, gap: 8, minWidth: 280 }}>
+            <div className="row gap-3 mobile-full" style={{ flex: 1, minWidth: 0 }}>
+              <div className="row hair" style={{ padding: '0 12px', height: 36, borderRadius: 8, gap: 8, flex: 1, minWidth: 0 }}>
                 <Icon.Search size={14} />
                 <input
                   value={q}

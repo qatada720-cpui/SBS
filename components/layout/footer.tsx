@@ -63,7 +63,7 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="row" style={{ gap: 56 }}>
+          <div className="row mobile-wrap" style={{ gap: 56 }}>
             {cols.map((c) => (
               <div key={c.head} className="col gap-3" style={{ minWidth: 120 }}>
                 <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)' }}>
