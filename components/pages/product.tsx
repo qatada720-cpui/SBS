@@ -364,7 +364,7 @@ export function ListingPage({ listingId }: { listingId: string }) {
                       {[1, 2, 3, 4, 5].map(s => <Icon.Star key={s} size={14} color="#C8922A" filled />)}
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 500 }}>4.9</span>
-                    <span className="muted" style={{ fontSize: 13 }}>from 14 verified reviews</span>
+                    <span className="muted" style={{ fontSize: 13 }}>no reviews yet</span>
                   </div>
                 </div>
                 <div className="col gap-4">

@@ -54,11 +54,11 @@ export function Footer() {
               A premium B2B marketplace where entrepreneurs safely buy and sell businesses. Verified listings, escrowed payments, phased ownership transitions.
             </p>
             <div className="row gap-2" style={{ marginTop: 4 }}>
-              <span className="badge badge-verified">
-                <Icon.Shield size={10} /> SOC 2 Type II
-              </span>
               <span className="badge">
                 <Icon.Lock size={10} /> Escrow protected
+              </span>
+              <span className="badge">
+                <Icon.Shield size={10} /> Verified listings
               </span>
             </div>
           </div>
@@ -86,7 +86,7 @@ export function Footer() {
         </div>
 
         <div className="hair-t row" style={{ paddingTop: 24, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>© 2026 SafeBusineSSSelling B.V. KvK 81234567. Amsterdam, NL.</span>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>© 2026 SafeBusineSSSelling B.V. Amsterdam, NL.</span>
           <span style={{ fontSize: 12, color: 'var(--muted)' }} className="row gap-2">
             <Icon.Dot size={5} color="#00A86B" /> All systems operational
           </span>

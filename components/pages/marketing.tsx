@@ -168,13 +168,13 @@ export function HomePage() {
 
           {/* Bottom trust line */}
           <div className="row gap-3" style={{ justifyContent: 'center', flexWrap: 'wrap', fontSize: 11, color: 'var(--muted)', paddingTop: 4 }}>
-            <span className="row gap-2"><Icon.Dot size={4} color="#00A86B" /> 95% success rate</span>
+            <span className="row gap-2"><Icon.Dot size={4} color="#00A86B" /> No password needed</span>
             <span style={{ opacity: 0.4 }}>·</span>
             <span>Verified documents</span>
             <span style={{ opacity: 0.4 }}>·</span>
-            <span>€200k+ minimum</span>
-            <span style={{ opacity: 0.4 }}>·</span>
             <span>Phased ownership</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>Based in Amsterdam</span>
           </div>
         </div>
       </div>
@@ -325,7 +325,7 @@ export function HowItWorksPage() {
   const sellerSteps = [
     { n: '01', t: 'Submit your financials', d: 'Upload last 3 years of financials and tax filings. We use them to verify revenue and EBITDA, and generate a structured listing.', dur: '~30 min' },
     { n: '02', t: 'Verification + AI listing copy', d: 'Our verification team confirms ownership, financials, and trade references. Our AI drafts your listing — you approve every word.', dur: '5–10 days' },
-    { n: '03', t: 'Earn your listing score', d: 'Higher completeness, third-party reviews, and clean diligence files compound into your listing score. Premium listings see 4.2× more buyer interest.', dur: 'Ongoing' },
+    { n: '03', t: 'Earn your listing score', d: 'Higher completeness, third-party reviews, and clean diligence files compound into your listing score. A complete listing gets more serious buyer attention.', dur: 'Ongoing' },
     { n: '04', t: 'Vet inbound buyers', d: 'Only buyers who have signed an NDA + funded escrow can message you. Every buyer profile is verified.', dur: 'Live' },
     { n: '05', t: 'Phased close with handover', d: 'You stay operational through Phase 2 with locked KPIs. Equity transfers as milestones clear; the platform holds funds in escrow.', dur: '6–18 months' },
   ];
@@ -447,30 +447,6 @@ export function AboutPage() {
       </section>
 
 
-<section className="hair-t section-sm">
-        <div className="container">
-          <div className="col gap-3" style={{ marginBottom: 32, maxWidth: 620 }}>
-            <SectionEyebrow>Safety stats</SectionEyebrow>
-            <h2 style={{ fontSize: 32 }}>The numbers behind "safely."</h2>
-          </div>
-          <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0, border: '0.5px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-            {[
-              { v: '7-step', l: 'Verification process', d: 'Identity, ownership, financials, tax filings, trade refs, sector compliance, beneficial owners.' },
-              { v: '€10M', l: 'Escrow capacity', d: 'Funds held by a regulated trustee. Released only on milestone trigger.' },
-              { v: '€2.5M', l: 'Indemnity insurance', d: 'Per-deal coverage against verified misrepresentation. Underwritten by Lloyd\'s.' },
-              { v: '24h', l: 'Deal-coordinator SLA', d: 'A named coordinator responds within 24 hours, every weekday.' },
-              { v: 'SOC 2', l: 'Type II certified', d: 'Annual audit by an independent security firm. Report on request.' },
-              { v: 'AFM-reg', l: 'Dutch financial supervision', d: 'SBS B.V. operates under AFM-registered escrow rules.' },
-            ].map((s, i) => (
-              <div key={i} className="col gap-3" style={{ padding: 28, borderRight: ((i + 1) % 3 !== 0) ? '0.5px solid var(--border)' : 'none', borderTop: i >= 3 ? '0.5px solid var(--border)' : 'none' }}>
-                <div style={{ fontSize: 32, fontWeight: 500, letterSpacing: -1 }}>{s.v}</div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{s.l}</div>
-                <p style={{ fontSize: 12, color: 'var(--subtle)', fontWeight: 300, lineHeight: 1.5 }}>{s.d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

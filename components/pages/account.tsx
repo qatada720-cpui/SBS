@@ -82,7 +82,7 @@ export function SellerOnboardingPage() {
               <span className="tabular" style={{ fontSize: 18, fontWeight: 500, letterSpacing: -0.4 }}>{score}%</span>
             </div>
             <ScoreBar score={score} />
-            <span className="muted" style={{ fontSize: 11 }}>Higher scores get 4.2× more buyer interest.</span>
+            <span className="muted" style={{ fontSize: 11 }}>A higher score means a more complete listing.</span>
           </div>
         </div>
       </section>
@@ -279,7 +279,7 @@ export function SellerOnboardingPage() {
             {cur.id === 'phased' && (
               <div className="col gap-4">
                 <p className="subtle" style={{ fontSize: 14, fontWeight: 300, maxWidth: 560 }}>
-                  Listings that use our default 3-phase contract get a +10 listing score boost and 3× more inbound interest. You can opt out, but most serious buyers expect it.
+                  Listings that use our default 3-phase contract get a listing score boost. You can opt out, but most serious buyers expect a structured handover.
                 </p>
 
                 <div className="card" style={{ padding: 28 }}>
@@ -436,7 +436,7 @@ export function SellerDashboardPage() {
                     <span className="muted">/ 100</span>
                   </div>
                   <ScoreBar score={92} />
-                  <p className="muted" style={{ fontSize: 12 }}>Top 8% of listings on platform.</p>
+                  <p className="muted" style={{ fontSize: 12 }}>Early listing on the platform.</p>
                 </div>
 
                 {/* Activity */}
@@ -592,7 +592,7 @@ export function SellerDashboardPage() {
               <div className="card col gap-4" style={{ padding: 28, flex: 1 }}>
                 <PremiumBadge />
                 <h4>Reach 100% with Premium</h4>
-                <p className="muted" style={{ fontSize: 13 }}>Premium listings appear at the top of the marketplace and in AI match shortlists. Average lift: 4.2× more verified buyer interest.</p>
+                <p className="muted" style={{ fontSize: 13 }}>Premium listings appear at the top of the marketplace and in AI match shortlists.</p>
                 <ul className="col gap-2" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                   {['Featured placement', 'Gold premium badge', 'Priority verification (48h)', 'Dedicated advisor'].map(x => (
                     <li key={x} className="row gap-2" style={{ fontSize: 13 }}><Icon.Check size={11} color="#C8922A" /> {x}</li>
