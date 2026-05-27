@@ -368,8 +368,26 @@ input:focus, textarea:focus, select:focus {
 }
 .pulse { animation: pulse-soft 1.4s ease-in-out infinite; }
 
+/* Nav mobile menu */
+.nav-desktop { display: flex; align-items: center; }
+.nav-mobile-btn { display: none; }
+.nav-mobile-menu {
+  position: absolute;
+  top: 64px;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--bg) 97%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: var(--hairline) solid var(--border);
+  padding: 12px 0 20px;
+  z-index: 49;
+}
+
 /* ─── Mobile (≤ 767 px) ─── */
 @media (max-width: 767px) {
+  .nav-desktop { display: none !important; }
+  .nav-mobile-btn { display: flex !important; }
   h1 { font-size: 36px; letter-spacing: -1px; }
   h2 { font-size: 26px; letter-spacing: -0.6px; }
 
