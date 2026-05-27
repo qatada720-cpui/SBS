@@ -110,7 +110,7 @@ export function HomePage() {
   }, [navigating, thinking, groqHistory, router]);
 
   return (
-    <div className="page-enter" style={{ minHeight: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
+    <div className="page-enter" style={{ height: 'calc(100dvh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <section style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 0' }}>
         <div className="col" style={{ width: '100%', maxWidth: 680, flex: 1, minHeight: 0 }}>
           {/* Small header */}
