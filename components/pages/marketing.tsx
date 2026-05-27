@@ -446,28 +446,8 @@ export function AboutPage() {
         </div>
       </section>
 
-      <section className="hair-t section">
-        <div className="container">
-          <div className="col gap-3" style={{ marginBottom: 56 }}>
-            <SectionEyebrow>Team</SectionEyebrow>
-            <h2>Operators, auditors, and engineers.</h2>
-          </div>
-          <div className="mobile-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
-            {TEAM.map(p => (
-              <div key={p.name} className="col gap-4">
-                <div className="img-ph" style={{ aspectRatio: '4/5', borderRadius: 8 }} />
-                <div className="col gap-2">
-                  <div style={{ fontSize: 15, fontWeight: 500, letterSpacing: -0.2 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{p.role}</div>
-                  <p style={{ fontSize: 13, color: 'var(--subtle)', fontWeight: 300, lineHeight: 1.55, marginTop: 4 }}>{p.bio}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      <section className="hair-t section-sm">
+<section className="hair-t section-sm">
         <div className="container">
           <div className="col gap-3" style={{ marginBottom: 32, maxWidth: 620 }}>
             <SectionEyebrow>Safety stats</SectionEyebrow>
