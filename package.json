@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
-    "dev": "next dev",
-    "dev:clean": "npm run clean && next dev",
+    "dev": "next dev --turbopack",
+    "dev:clean": "npm run clean && next dev --turbopack",
     "build": "next build",
     "build:clean": "npm run clean && next build",
     "start": "next start",
@@ -15,7 +15,7 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "groq-sdk": "^1.2.0",
-    "next": "^15.3.3",
+    "next": "^16.2.6",
     "pg": "^8.21.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
@@ -26,7 +26,7 @@
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
     "eslint": "^9.27.0",
-    "eslint-config-next": "^15.3.3",
+    "eslint-config-next": "^16.2.6",
     "typescript": "^5.8.3"
   }
 }
