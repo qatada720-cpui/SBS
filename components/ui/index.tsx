@@ -136,6 +136,7 @@ type ButtonProps = {
   disabled?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  href?: string;
 };
 
 export function Button({
@@ -149,14 +150,23 @@ export function Button({
   disabled,
   className = '',
   style,
+  href,
 }: ButtonProps) {
   const sz = size === 'lg' ? 'btn-lg' : size === 'sm' ? 'btn-sm' : '';
+  const cls = `btn btn-${variant} ${sz} ${className}`;
+  if (href) {
+    return (
+      <Link href={href} onClick={onClick} className={cls} style={style}>
+        {icon}{children}{iconRight}
+      </Link>
+    );
+  }
   return (
     <button
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`btn btn-${variant} ${sz} ${className}`}
+      className={cls}
       style={disabled ? { opacity: 0.4, cursor: 'not-allowed', ...style } : style}
     >
       {icon}

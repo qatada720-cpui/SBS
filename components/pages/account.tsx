@@ -376,9 +376,7 @@ export function SellerDashboardPage() {
             <AccountTabs />
           </div>
           <div className="row gap-3" style={{ justifyContent: 'flex-end' }}>
-            <Link href="/listing/l-001">
-              <Button variant="secondary" size="sm">View public listing</Button>
-            </Link>
+            <Button href="/listing/l-001" variant="secondary" size="sm">View public listing</Button>
             <Button variant="primary" size="sm" onClick={() => router.push('/seller/onboarding')}>Edit listing</Button>
           </div>
         </div>
@@ -632,9 +630,7 @@ export function BuyerDashboardPage() {
             <AccountTabs />
           </div>
           <div className="row gap-3" style={{ justifyContent: 'flex-end' }}>
-            <Link href="/">
-              <Button variant="secondary" size="sm">Chat with Ahmed AI</Button>
-            </Link>
+            <Button href="/" variant="secondary" size="sm">Chat with Ahmed AI</Button>
             <Button variant="primary" size="sm" onClick={() => router.push('/marketplace')} iconRight={<Icon.Arrow size={12} />}>Browse marketplace</Button>
           </div>
         </div>
@@ -671,9 +667,7 @@ export function BuyerDashboardPage() {
                   <p style={{ fontSize: 14 }}>{MATCHES.length} matches based on your buyer profile</p>
                   <p className="muted" style={{ fontSize: 12 }}>Updated 4 hours ago · Re-runs daily</p>
                 </div>
-                <Link href="/">
-                  <Button variant="ghost" size="sm">Refine with Ahmed AI →</Button>
-                </Link>
+                <Button href="/" variant="ghost" size="sm">Refine with Ahmed AI →</Button>
               </div>
 
               <div className="col gap-3">
@@ -700,9 +694,7 @@ export function BuyerDashboardPage() {
                         ))}
                       </div>
                       <div className="row gap-2" style={{ marginTop: 4 }}>
-                        <Link href={`/listing/${m.listing.id}`}>
-                          <Button variant="primary" size="sm">View listing</Button>
-                        </Link>
+                        <Button href={`/listing/${m.listing.id}`} variant="primary" size="sm">View listing</Button>
                         <Button variant="secondary" size="sm">Request NDA</Button>
                       </div>
                     </div>
@@ -725,9 +717,7 @@ export function BuyerDashboardPage() {
                         <span className="muted" style={{ fontSize: 12 }}>{d.listing.sector} · {d.listing.location}</span>
                       </div>
                     </div>
-                    <Link href={`/listing/${d.listing.id}`}>
-                      <Button variant="secondary" size="sm" iconRight={<Icon.ArrowUpRight size={11} />}>Open deal</Button>
-                    </Link>
+                    <Button href={`/listing/${d.listing.id}`} variant="secondary" size="sm" iconRight={<Icon.ArrowUpRight size={11} />}>Open deal</Button>
                   </div>
 
                   <PhaseTracker phases={PHASES} currentPhase={d.phase} />

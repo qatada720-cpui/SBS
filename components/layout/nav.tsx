@@ -74,9 +74,7 @@ export function Nav({ transparent = false }: { transparent?: boolean }) {
           >
             Sign in
           </Link>
-          <Link href="/sign-up">
-            <Button variant="primary" size="sm">Sign up</Button>
-          </Link>
+          <Button href="/sign-up" variant="primary" size="sm">Sign up</Button>
         </div>
 
         {/* Mobile hamburger */}
@@ -114,9 +112,7 @@ export function Nav({ transparent = false }: { transparent?: boolean }) {
               Sign in
             </Link>
             <div style={{ paddingTop: 12 }}>
-              <Link href="/sign-up" onClick={() => setOpen(false)}>
-                <Button variant="primary" size="sm" style={{ width: '100%', justifyContent: 'center' }}>Sign up</Button>
-              </Link>
+              <Button href="/sign-up" onClick={() => setOpen(false)} variant="primary" size="sm" style={{ width: '100%', justifyContent: 'center' }}>Sign up</Button>
             </div>
           </div>
         </div>

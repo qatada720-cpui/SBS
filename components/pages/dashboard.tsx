@@ -144,17 +144,15 @@ export function AccountDashboardPage() {
               <span style={{ fontSize: 14, fontWeight: 500 }}>Ready to list a business?</span>
               <span className="muted" style={{ fontSize: 13 }}>Start seller onboarding — same account, no extra signup.</span>
             </div>
-            <Link href="/seller/onboarding">
-              <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />}>List a business</Button>
-            </Link>
+            <Button href="/seller/onboarding" variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />}>List a business</Button>
           </div>
 
           <div className="col gap-3">
             <span className="muted" style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 500 }}>Quick actions</span>
             <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
-              <Link href="/marketplace"><Button variant="secondary" size="sm">Browse marketplace</Button></Link>
-              <Link href="/"><Button variant="secondary" size="sm">Chat with Ahmed AI</Button></Link>
-              <Link href="/messages"><Button variant="ghost" size="sm">Messages</Button></Link>
+              <Button href="/marketplace" variant="secondary" size="sm">Browse marketplace</Button>
+              <Button href="/" variant="secondary" size="sm">Chat with Ahmed AI</Button>
+              <Button href="/messages" variant="ghost" size="sm">Messages</Button>
             </div>
           </div>
 

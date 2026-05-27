@@ -536,11 +536,9 @@ export function AIMatchPage() {
                 </div>
 
                 <div className="row gap-2" style={{ marginTop: 4 }}>
-                  <Link href={`/listing/${String(l.id ?? '')}`}>
-                    <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />}>
-                      View listing
-                    </Button>
-                  </Link>
+                  <Button href={`/listing/${String(l.id ?? '')}`} variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />}>
+                    View listing
+                  </Button>
                   <Button variant="secondary" size="sm">Save</Button>
                 </div>
               </div>
@@ -551,11 +549,7 @@ export function AIMatchPage() {
           <div className="row hair" style={{ padding: 20, borderRadius: 10, justifyContent: 'space-between', alignItems: 'center', marginTop: 16, flexWrap: 'wrap', gap: 12 }}>
             <span style={{ fontSize: 13, color: 'var(--subtle)' }}>Want to refine your answers?</span>
             <div className="row gap-2">
-              <Link href="/">
-                <Button variant="ghost" size="sm">
-                  Chat with Ahmed AI again
-                </Button>
-              </Link>
+              <Button href="/" variant="ghost" size="sm">Chat with Ahmed AI again</Button>
               <Button variant="secondary" size="sm" onClick={() => router.push('/marketplace')}>
                 Browse marketplace
               </Button>
