@@ -425,10 +425,10 @@ export function AboutPage() {
 
       <section className="hair-t hair-b" style={{ padding: '56px 0' }}>
         <div className="container row" style={{ gap: 32, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-          <Stat value="€480M" label="Transacted on platform" />
-          <Stat value="0" label="Fraud incidents" sub="3 years operating" />
-          <Stat value="94%" label="Deal completion (post-LOI)" />
-          <Stat value="2,400" label="Verified businesses" />
+          <Stat value="2026" label="Founded" />
+          <Stat value="0" label="Fraud incidents" />
+          <Stat value="Free" label="To list your business" />
+          <Stat value="NL" label="Based in Amsterdam" />
         </div>
       </section>
 
