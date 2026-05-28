@@ -446,6 +446,25 @@ export function AboutPage() {
         </div>
       </section>
 
+      <section className="hair-t section">
+        <div className="container row mobile-wrap" style={{ alignItems: 'flex-start', gap: 80 }}>
+          <div className="mobile-full" style={{ flex: '0 0 280px' }}>
+            <SectionEyebrow>Team</SectionEyebrow>
+          </div>
+          <div className="col gap-6" style={{ flex: 1, maxWidth: 720 }}>
+            {[
+              { role: 'CEO', name: 'Qatada Al Shihabi' },
+              { role: 'CTO', name: 'Soufyan Lazreq' },
+              { role: 'Legal & Finance', name: 'Shehab Youssef' },
+            ].map(m => (
+              <div key={m.name} className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '0.5px solid var(--border)', paddingBottom: 20 }}>
+                <span style={{ fontSize: 15, fontWeight: 400 }}>{m.name}</span>
+                <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>{m.role}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
     </div>
   );
