@@ -284,13 +284,13 @@ export function SellerOnboardingPage() {
   const breakdown = [
     { label: 'Business basics complete', weight: 15, done: !!(form.name && form.sector && form.location) },
     { label: 'Financial summary entered', weight: 20, done: !!(form.revenue && form.ebitda && form.asking) },
-    { label: '3 years of financials uploaded', weight: 15, done: form.financialsUploaded },
-    { label: 'Tax filings uploaded', weight: 10, done: form.taxFilingsUploaded },
+    { label: '3 years of financials uploaded', weight: 15, done: !!form.financialsUploaded },
+    { label: 'Tax filings uploaded', weight: 10, done: !!form.taxFilingsUploaded },
     { label: 'AI narrative approved', weight: 10, done: form.description.length > 40 },
     { label: '3+ photos uploaded', weight: 10, done: form.photosUploaded >= 3 },
     { label: '3+ trade references', weight: 5, done: form.referencesAdded >= 3 },
     { label: 'Phased ownership signed', weight: 10, done: form.phasedAccepted },
-    { label: 'Submitted for verification', weight: 5, done: step >= steps.length - 1 && form.financialsUploaded },
+    { label: 'Submitted for verification', weight: 5, done: step >= steps.length - 1 && !!form.financialsUploaded },
   ];
 
   const stepComplete = useMemo(() => ({
