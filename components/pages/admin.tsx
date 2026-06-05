@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Icon, SectionEyebrow } from '@/components/ui';
-import { createClient } from '@/lib/supabase-browser';
+import { createClient as _createClient } from '@/lib/supabase-browser';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createClient = () => _createClient() as any;
 
 type PendingListing = {
   id: string;

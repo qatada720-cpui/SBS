@@ -6,7 +6,9 @@ import { Button, Icon, VerifiedBadge, ScoreBar, PhaseTracker, ListingCard, Secti
 import { SECTORS, PHASES } from '@/lib/data';
 import type { Listing } from '@/lib/data';
 import { AccountTabs } from '@/components/layout/account-tabs';
-import { createClient } from '@/lib/supabase-browser';
+import { createClient as _createClient } from '@/lib/supabase-browser';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createClient = () => _createClient() as any;
 import type { User } from '@supabase/supabase-js';
 
 function formatEur(n: number): string {

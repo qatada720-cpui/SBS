@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { Button, Icon, VerifiedBadge, ScoreBar, PhaseTracker, ListingCard, SectionEyebrow } from '@/components/ui';
 import { SECTORS, PHASES, REVIEWS } from '@/lib/data';
 import type { Listing } from '@/lib/data';
-import { createClient } from '@/lib/supabase-browser';
+import { createClient as _createClient } from '@/lib/supabase-browser';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createClient = () => _createClient() as any;
 
 const PRICE_RANGES = [
   { label: 'Any price', min: 0, max: 0 },
