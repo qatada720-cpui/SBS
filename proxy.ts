@@ -24,10 +24,13 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   // Redirect unauthenticated users away from protected pages
-  const protectedPaths = ['/dashboard', '/seller/dashboard', '/buyer/dashboard', '/messages'];
-  const isProtected = protectedPaths.some((p) => request.nextUrl.pathname.startsWith(p));
+  const protectedPaths = ['/dashboard', '/seller', '/buyer', '/messages', '/admin', '/ai-match'];
+  const { pathname } = request.nextUrl;
+  const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
   if (isProtected && !user) {
-    return NextResponse.redirect(new URL('/sign-in', request.url));
+    const signIn = new URL('/sign-in', request.url);
+    signIn.searchParams.set('next', pathname);
+    return NextResponse.redirect(signIn);
   }
 
   // Redirect logged-in users away from auth pages
