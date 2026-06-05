@@ -19,21 +19,29 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `Extract a structured buyer profile from this conversation. Return ONLY valid JSON, nothing else. Be precise — if something was not mentioned, use null.
+          content: `Extract a structured buyer profile from this conversation. The conversation may be in Dutch or English — handle both.
+
+Return ONLY valid JSON, nothing else. If something was not mentioned, use null.
+
+Number conversion rules:
+- "1 miljoen" or "1 million" = 1000000
+- "500k" or "500 duizend" = 500000
+- "2,5 miljoen" = 2500000
+- "anderhalf miljoen" or "1.5 million" = 1500000
 
 {
-  "sectors": [],          // REQUIRED: list of sectors the buyer explicitly wants, e.g. ["SaaS", "E-commerce"]. Empty array [] means ANY sector.
-  "sectors_excluded": [], // sectors the buyer explicitly does NOT want
-  "budget_max": null,     // maximum acquisition price in euros (number), null if not mentioned
-  "budget_min": null,     // minimum acquisition price in euros (number), null if not mentioned
-  "revenue_min": null,    // minimum annual revenue in euros (number), null if not mentioned
-  "ebitda_min": null,     // minimum annual EBITDA in euros (number), null if not mentioned
-  "location": null,       // preferred country or region as a string, null if flexible
-  "remote_ok": true,      // true if location-independent/remote is acceptable
-  "involvement": null,    // "operator", "strategic", or "investor" — how hands-on they'll be
-  "timeline_months": null,// max months to close, null if flexible
-  "seller_staying": null, // true if they need the seller to stay on post-sale
-  "dealbreakers": [],     // list of explicit deal-breakers
+  "sectors": [],          // sectors the buyer wants, e.g. ["Logistics", "SaaS"]. Empty array = ANY sector. Map Dutch: logistiek=Logistics, zorg=Healthcare, horeca=Food & Beverage, software=SaaS, webshop=E-commerce
+  "sectors_excluded": [], // sectors they do NOT want
+  "budget_max": null,     // maximum price in euros as a number
+  "budget_min": null,     // minimum price in euros as a number
+  "revenue_min": null,    // minimum annual revenue in euros as a number
+  "ebitda_min": null,     // minimum annual profit/EBITDA in euros as a number
+  "location": null,       // preferred country or city as English string, null if flexible
+  "remote_ok": true,      // true if online/remote business is OK
+  "involvement": null,    // "operator" (full-time), "strategic" (part-time), or "investor" (passive/hands-off)
+  "timeline_months": null,// how many months to close
+  "seller_staying": null, // true if they want the seller to stay on
+  "dealbreakers": [],     // list of deal-breakers as strings
   "experience": null      // "first-time" or "experienced"
 }`,
         },
@@ -56,12 +64,11 @@ export async function POST(req: NextRequest) {
       profile = {};
     }
 
-    // Step 2: Fetch all live verified listings from Supabase
+    // Step 2: Fetch all live listings from Supabase
     const { data: allListings } = await supabase
       .from('listings')
       .select('*')
-      .eq('status', 'live')
-      .eq('verified', true);
+      .eq('status', 'live');
 
     if (!allListings || allListings.length === 0) {
       return NextResponse.json({ matches: [], profile });
@@ -117,20 +124,21 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are a business acquisition matching engine. Score each listing 0–100 based on fit with the buyer profile.
+          content: `You are a business acquisition matching engine. Score each listing 0–100 based purely on fit with the buyer profile.
 
-SCORING RULES — apply strictly:
-- Sector match is mandatory. If the sector doesn't match what the buyer wants, score 0. Never recommend a gardening business to someone who wants SaaS.
-- Budget fit: if asking_price is within the buyer's budget → up to 30 points.
-- Revenue/EBITDA fit: if metrics meet the buyer's minimums → up to 25 points.
-- Location fit: if location matches or buyer is flexible → up to 20 points.
-- Business model fit (recurring revenue, profitability, growth) → up to 15 points.
-- Other factors (deal-breakers avoided, involvement type, etc.) → up to 10 points.
+CRITICAL INTEGRITY RULE: Premium status, verified status, or any platform feature of a listing must NEVER influence the score. A premium listing with poor fit scores low. A non-premium listing with perfect fit scores high. Scores are 100% based on buyer-listing fit only.
+
+SCORING BREAKDOWN:
+- Sector match: mandatory. Wrong sector = 0. Correct sector = up to 35 points.
+- Budget fit: asking_price within buyer's budget = up to 25 points.
+- Revenue/profitability fit: meets buyer's minimums = up to 20 points.
+- Location fit: matches preference or buyer is flexible = up to 15 points.
+- Other fit factors (deal-breakers avoided, involvement match) = up to 5 points.
 
 Return ONLY a JSON array, nothing else:
-[{"id": "uuid", "fit": 87, "reasons": ["SaaS — matches target sector", "Asking price within budget", "Strong recurring revenue"]}]
+[{"id": "uuid", "fit": 87, "reasons": ["Logistics — matches target sector", "Asking price within budget", "Profitable and growing"]}]
 
-Be honest. Only high scores (70+) for genuinely strong matches. Scores below 40 mean it's a poor fit.`,
+Be honest. 70+ = strong match. 40–69 = partial match. Below 40 = poor fit.`,
         },
         {
           role: 'user',
@@ -146,6 +154,7 @@ ${JSON.stringify(filtered.map((l) => ({
   ebitda: l.ebitda,
   asking_price: l.asking_price,
   description: l.description,
+  // premium and verified intentionally excluded — scores must be purely fit-based
 })))}`,
         },
       ],
@@ -168,7 +177,7 @@ ${JSON.stringify(filtered.map((l) => ({
         ...s,
         listing: allListings.find((l) => l.id === s.id),
       }))
-      .filter((m) => m.listing && m.fit >= 50)
+      .filter((m) => m.listing && m.fit >= 30)
       .sort((a, b) => b.fit - a.fit);
 
     return NextResponse.json({ matches, profile });

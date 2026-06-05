@@ -296,6 +296,13 @@ input:focus, textarea:focus, select:focus {
 }
 .scroll-x::-webkit-scrollbar { display: none; }
 
+/* Chat scroll area — no scrollbar */
+.chat-scroll {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.chat-scroll::-webkit-scrollbar { display: none; }
+
 /* Listing image placeholder */
 .img-ph {
   position: relative;

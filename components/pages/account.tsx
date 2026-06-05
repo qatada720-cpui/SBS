@@ -1,14 +1,239 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Icon, VerifiedBadge, PremiumBadge, ScoreBar, PhaseTracker, ListingCard, SectionEyebrow, Field } from '@/components/ui';
-import { LISTINGS, SECTORS, PHASES, MATCHES } from '@/lib/data';
+import { Button, Icon, VerifiedBadge, ScoreBar, PhaseTracker, ListingCard, SectionEyebrow, Field } from '@/components/ui';
+import { SECTORS, PHASES } from '@/lib/data';
+import type { Listing } from '@/lib/data';
 import { AccountTabs } from '@/components/layout/account-tabs';
+import { createClient } from '@/lib/supabase-browser';
+import type { User } from '@supabase/supabase-js';
+
+function formatEur(n: number): string {
+  if (n >= 1_000_000) return `€${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `€${Math.round(n / 1_000)}K`;
+  return `€${n}`;
+}
+
+type DbListing = {
+  id: string; name: string; sector: string; location: string;
+  revenue: number; ebitda: number; asking_price: number;
+  description: string | null; score: number; verified: boolean;
+  premium: boolean; photos: string[];
+};
+
+type SavedRow = {
+  id: string; buyer_id: string; listing_id: string; saved_at: string;
+  listings: DbListing;
+};
+
+type NdaRow = {
+  id: string; listing_id: string; status: string;
+};
+
+type AiMatch = {
+  id: string; fit: number; reasons: string[];
+  listing: Record<string, unknown>;
+};
+
+function dbToCard(r: DbListing): Listing {
+  return {
+    id: r.id, name: r.name, sector: r.sector, location: r.location,
+    revenue: formatEur(r.revenue),
+    ebitda: r.ebitda ? formatEur(r.ebitda) : undefined,
+    asking: formatEur(r.asking_price),
+    score: r.score, verified: r.verified, premium: r.premium,
+    photos: r.photos?.length ?? 0,
+    description: r.description ?? '',
+  };
+}
+
+const SECTOR_OPTIONS = ['SaaS', 'E-commerce / DTC', 'Logistics', 'Healthcare', 'Food & Beverage', 'Automotive', 'Professional Services', 'Services', 'Other'];
+
+const LOCATION_OPTIONS = [
+  { label: 'Amsterdam, NL', flag: '🇳🇱' },
+  { label: 'Rotterdam, NL', flag: '🇳🇱' },
+  { label: 'The Hague, NL', flag: '🇳🇱' },
+  { label: 'Utrecht, NL', flag: '🇳🇱' },
+  { label: 'Eindhoven, NL', flag: '🇳🇱' },
+  { label: 'Antwerp, BE', flag: '🇧🇪' },
+  { label: 'Brussels, BE', flag: '🇧🇪' },
+  { label: 'Ghent, BE', flag: '🇧🇪' },
+  { label: 'Berlin, DE', flag: '🇩🇪' },
+  { label: 'Hamburg, DE', flag: '🇩🇪' },
+  { label: 'Munich, DE', flag: '🇩🇪' },
+  { label: 'Frankfurt, DE', flag: '🇩🇪' },
+  { label: 'Düsseldorf, DE', flag: '🇩🇪' },
+  { label: 'Cologne, DE', flag: '🇩🇪' },
+  { label: 'Zurich, CH', flag: '🇨🇭' },
+  { label: 'Geneva, CH', flag: '🇨🇭' },
+  { label: 'Vienna, AT', flag: '🇦🇹' },
+  { label: 'Warsaw, PL', flag: '🇵🇱' },
+  { label: 'Paris, FR', flag: '🇫🇷' },
+  { label: 'London, UK', flag: '🇬🇧' },
+  { label: 'Madrid, ES', flag: '🇪🇸' },
+  { label: 'Remote / Online', flag: '🌐' },
+];
+
+function LocationPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [custom, setCustom] = useState(false);
+
+  const known = LOCATION_OPTIONS.find(l => l.label === value);
+  const filtered = query
+    ? LOCATION_OPTIONS.filter(l => l.label.toLowerCase().includes(query.toLowerCase()))
+    : LOCATION_OPTIONS;
+
+  function selectOption(label: string) {
+    onChange(label);
+    setQuery('');
+    setOpen(false);
+    setCustom(false);
+  }
+
+  return (
+    <div style={{ position: 'relative', flex: 1 }}>
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          height: 42, borderRadius: 8, border: '0.5px solid var(--border-strong)',
+          background: 'var(--surface)', padding: '0 12px', cursor: 'text',
+        }}
+        onClick={() => { setOpen(true); }}
+      >
+        {known && !open && <span style={{ fontSize: 16 }}>{known.flag}</span>}
+        <input
+          value={open ? query : (value || '')}
+          onChange={e => { setQuery(e.target.value); onChange(e.target.value); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="City, Country"
+          style={{
+            flex: 1, fontSize: 14, background: 'transparent', border: 'none',
+            outline: 'none', color: 'var(--fg)',
+          }}
+        />
+        {value && !open && (
+          <button
+            type="button"
+            onMouseDown={e => { e.preventDefault(); onChange(''); setQuery(''); }}
+            style={{ fontSize: 16, color: 'var(--muted)', cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}
+          >×</button>
+        )}
+      </div>
+
+      {open && (filtered.length > 0 || query) && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50,
+          background: 'var(--surface)', border: '0.5px solid var(--border-strong)',
+          borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          maxHeight: 240, overflowY: 'auto',
+        }}>
+          {filtered.map(l => (
+            <button
+              key={l.label}
+              type="button"
+              onMouseDown={() => selectOption(l.label)}
+              style={{
+                width: '100%', textAlign: 'left', padding: '9px 14px',
+                fontSize: 14, background: 'transparent', cursor: 'pointer',
+                color: value === l.label ? 'var(--blue)' : 'var(--fg)',
+                fontWeight: value === l.label ? 500 : 300,
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{ fontSize: 16, lineHeight: 1 }}>{l.flag}</span>
+              <span>{l.label}</span>
+            </button>
+          ))}
+          {filtered.length === 0 && query && (
+            <div style={{ padding: '9px 14px', fontSize: 13, color: 'var(--muted)' }}>
+              No results — press Enter to use "<strong style={{ color: 'var(--fg)' }}>{query}</strong>"
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const isOther = value !== '' && !SECTOR_OPTIONS.slice(0, -1).includes(value);
+  const displayOther = isOther;
+
+  return (
+    <div style={{ position: 'relative', flex: 1 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', textAlign: 'left', padding: '0 12px',
+          height: 42, borderRadius: 8, border: '0.5px solid var(--border-strong)',
+          background: 'var(--surface)', color: value ? 'var(--fg)' : 'var(--muted)',
+          fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          cursor: 'pointer',
+        }}
+      >
+        <span>{displayOther ? 'Other' : (value || 'Select sector')}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50,
+          background: 'var(--surface)', border: '0.5px solid var(--border-strong)',
+          borderRadius: 10, overflow: 'hidden',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        }}>
+          {SECTOR_OPTIONS.map(s => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => {
+                if (s !== 'Other') onChange(s);
+                else onChange('');
+                setOpen(false);
+              }}
+              style={{
+                width: '100%', textAlign: 'left', padding: '10px 14px',
+                fontSize: 14, background: 'transparent', cursor: 'pointer',
+                color: (s === 'Other' ? displayOther : value === s) ? 'var(--blue)' : 'var(--fg)',
+                borderBottom: s === SECTOR_OPTIONS[SECTOR_OPTIONS.length - 2] ? '0.5px solid var(--border)' : 'none',
+                fontWeight: (s === 'Other' ? displayOther : value === s) ? 500 : 300,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {displayOther && (
+        <input
+          autoFocus
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="Type your sector…"
+          style={{ marginTop: 8, width: '100%', fontSize: 14, padding: '0 12px', height: 42, borderRadius: 8, border: '0.5px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--fg)', boxSizing: 'border-box' }}
+        />
+      )}
+    </div>
+  );
+}
 
 export function SellerOnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [showMissing, setShowMissing] = useState(false);
   const [form, setForm] = useState({
     name: 'Northwind Logistics',
     sector: 'Logistics',
@@ -19,11 +244,16 @@ export function SellerOnboardingPage() {
     ebitda: '480000',
     asking: '1900000',
     description: '',
-    financialsUploaded: false,
-    taxFilingsUploaded: false,
+    financialsUploaded: '' as string,
+    taxFilingsUploaded: '' as string,
     photosUploaded: 0,
     referencesAdded: 0,
     phasedAccepted: false,
+    customPhases: [
+      { title: 'LOI & Discovery', ownership: 0 },
+      { title: 'Operating handover', ownership: 51 },
+      { title: 'Full ownership', ownership: 100 },
+    ] as { title: string; ownership: number }[],
   });
 
   const steps = [
@@ -63,6 +293,42 @@ export function SellerOnboardingPage() {
     { label: 'Submitted for verification', weight: 5, done: step >= steps.length - 1 && form.financialsUploaded },
   ];
 
+  const stepComplete = useMemo(() => ({
+    basics: !!(form.name && form.sector && form.location && form.founded && form.employees),
+    financials: !!(form.revenue && form.ebitda && form.asking),
+    verification: form.financialsUploaded && form.taxFilingsUploaded,
+    narrative: form.description.length > 40,
+    media: form.photosUploaded >= 3 && form.referencesAdded >= 1,
+    phased: form.phasedAccepted && form.customPhases[form.customPhases.length - 1]?.ownership === 100,
+    review: false,
+  }), [form]);
+
+  async function handleSubmit() {
+    const allRequired = stepComplete.basics && stepComplete.financials && stepComplete.verification && stepComplete.phased;
+    if (!allRequired) return;
+    setSubmitting(true);
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setSubmitting(false); return; }
+    await supabase.from('listings').insert({
+      seller_id: session.user.id,
+      name: form.name,
+      sector: form.sector,
+      location: form.location,
+      founded: Number(form.founded),
+      employees: Number(form.employees),
+      revenue: form.revenue,
+      ebitda: form.ebitda,
+      asking_price: Number(form.asking),
+      description: form.description,
+      status: 'pending_review',
+      score: score,
+      phases: form.customPhases,
+    });
+    setSubmitting(false);
+    router.push('/seller/dashboard');
+  }
+
   const cur = steps[step];
 
   return (
@@ -92,14 +358,14 @@ export function SellerOnboardingPage() {
           {/* Steps rail */}
           <div className="col gap-1" style={{ width: 240, position: 'sticky', top: 88 }}>
             {steps.map((s, i) => {
-              const done = i < step;
+              const done = stepComplete[s.id as keyof typeof stepComplete];
               const active = i === step;
               return (
                 <button key={s.id} onClick={() => setStep(i)}
                   className="row gap-3" style={{
                     padding: '12px 14px', borderRadius: 8, textAlign: 'left',
                     background: active ? 'var(--surface-2)' : 'transparent',
-                    color: active || done ? 'var(--fg)' : 'var(--subtle)',
+                    color: active || done ? 'var(--fg)' : 'var(--muted)',
                     transition: 'all 0.15s ease',
                   }}>
                   <span style={{
@@ -130,15 +396,15 @@ export function SellerOnboardingPage() {
                 <Field label="Business name">
                   <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                 </Field>
-                <div className="row gap-3">
-                  <Field label="Sector">
-                    <select value={form.sector} onChange={e => setForm({ ...form, sector: e.target.value })}>
-                      {SECTORS.slice(1).map(s => <option key={s}>{s}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Location">
-                    <input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
-                  </Field>
+                <div className="row gap-3" style={{ alignItems: 'flex-start' }}>
+                  <div className="col gap-2" style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--subtle)', letterSpacing: 0.3 }}>Sector</label>
+                    <SectorPicker value={form.sector} onChange={v => setForm({ ...form, sector: v })} />
+                  </div>
+                  <div className="col gap-2" style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--subtle)', letterSpacing: 0.3 }}>Location</label>
+                    <LocationPicker value={form.location} onChange={v => setForm({ ...form, location: v })} />
+                  </div>
                 </div>
                 <div className="row gap-3">
                   <Field label="Year founded">
@@ -178,8 +444,8 @@ export function SellerOnboardingPage() {
             {cur.id === 'verification' && (
               <div className="col gap-3">
                 {([
-                  { k: 'financialsUploaded' as const, label: 'Last 3 years of financials', desc: 'P&L, balance sheet, cash flow. PDF or XLSX.', sample: 'financials-2023-2025.pdf · 2.4 MB' },
-                  { k: 'taxFilingsUploaded' as const, label: 'Tax filings', desc: 'Last 3 fiscal-year corporate tax filings.', sample: 'tax-filings-bundle.pdf · 1.1 MB' },
+                  { k: 'financialsUploaded' as const, label: 'Last 3 years of financials', desc: 'P&L, balance sheet, cash flow. PDF or XLSX.', accept: '.pdf,.xlsx,.xls' },
+                  { k: 'taxFilingsUploaded' as const, label: 'Tax filings', desc: 'Last 3 fiscal-year corporate tax filings. PDF or image.', accept: '.pdf,.jpg,.jpeg,.png' },
                 ]).map(u => (
                   <div key={u.k} className="card col gap-3" style={{ padding: 20 }}>
                     <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -189,13 +455,26 @@ export function SellerOnboardingPage() {
                       </div>
                       {form[u.k]
                         ? <span className="badge badge-verified"><Icon.Check size={10} /> Uploaded</span>
-                        : <Button variant="secondary" size="sm" icon={<Icon.Upload size={12} />} onClick={() => setForm({ ...form, [u.k]: true })}>Upload</Button>}
+                        : <label style={{ cursor: 'pointer' }}>
+                            <input
+                              type="file"
+                              accept={u.accept}
+                              style={{ display: 'none' }}
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) setForm({ ...form, [u.k]: file.name });
+                              }}
+                            />
+                            <span className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
+                              <Icon.Upload size={12} /> Upload
+                            </span>
+                          </label>}
                     </div>
                     {form[u.k] && (
                       <div className="row gap-3 hair" style={{ padding: '10px 14px', borderRadius: 6, fontSize: 12, color: 'var(--subtle)' }}>
                         <Icon.Doc size={12} />
-                        <span style={{ flex: 1 }}>{u.sample}</span>
-                        <button onClick={() => setForm({ ...form, [u.k]: false })} style={{ color: 'var(--muted)' }}><Icon.X size={11} /></button>
+                        <span style={{ flex: 1 }}>{form[u.k]}</span>
+                        <button onClick={() => setForm({ ...form, [u.k]: '' })} style={{ color: 'var(--muted)' }}><Icon.X size={11} /></button>
                       </div>
                     )}
                   </div>
@@ -279,27 +558,73 @@ export function SellerOnboardingPage() {
             {cur.id === 'phased' && (
               <div className="col gap-4">
                 <p className="subtle" style={{ fontSize: 14, fontWeight: 300, maxWidth: 560 }}>
-                  Listings that use our default 3-phase contract get a listing score boost. You can opt out, but most serious buyers expect a structured handover.
+                  Define how ownership transfers to the buyer. Add as many phases as you like — the final phase must reach 100%. Buyers see this structure before making an offer.
                 </p>
 
-                <div className="card" style={{ padding: 28 }}>
-                  <PhaseTracker phases={PHASES} currentPhase={1} compact />
-                </div>
+                {form.customPhases.length > 0 && (
+                  <div className="card" style={{ padding: 28 }}>
+                    <PhaseTracker phases={form.customPhases} currentPhase={1} compact />
+                  </div>
+                )}
 
                 <div className="col gap-2">
-                  {PHASES.map((p, i) => (
-                    <div key={i} className="row hair gap-4" style={{ padding: 16, borderRadius: 8, alignItems: 'flex-start' }}>
-                      <span className="tabular" style={{ fontSize: 14, fontWeight: 500, minWidth: 50 }}>Phase {i + 1}</span>
-                      <span style={{ fontSize: 13, flex: 1 }}>{p.title}</span>
-                      <span className="muted tabular" style={{ fontSize: 13 }}>{p.ownership}% ownership</span>
-                    </div>
-                  ))}
+                  {form.customPhases.map((p, i) => {
+                    const isLast = i === form.customPhases.length - 1;
+                    return (
+                      <div key={i} className="row hair gap-3" style={{ padding: '12px 16px', borderRadius: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)', minWidth: 20 }}>{i + 1}</span>
+                        <input
+                          value={p.title}
+                          onChange={e => {
+                            const next = [...form.customPhases];
+                            next[i] = { ...next[i], title: e.target.value };
+                            setForm({ ...form, customPhases: next });
+                          }}
+                          placeholder="Phase name"
+                          style={{ flex: 1, fontSize: 13, background: 'transparent', border: 'none', outline: 'none', color: 'var(--fg)' }}
+                        />
+                        <div className="row gap-1" style={{ alignItems: 'center' }}>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={p.ownership}
+                            onChange={e => {
+                              const next = [...form.customPhases];
+                              next[i] = { ...next[i], ownership: Number(e.target.value) };
+                              setForm({ ...form, customPhases: next });
+                            }}
+                            style={{ width: 54, fontSize: 13, textAlign: 'right', background: 'transparent', border: 'none', outline: 'none', color: 'var(--fg)' }}
+                          />
+                          <span className="muted" style={{ fontSize: 13 }}>%</span>
+                        </div>
+                        {form.customPhases.length > 1 && (
+                          <button
+                            onClick={() => setForm({ ...form, customPhases: form.customPhases.filter((_, j) => j !== i) })}
+                            style={{ fontSize: 16, color: 'var(--muted)', cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}
+                          >×</button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="row gap-2">
+                  <button
+                    onClick={() => setForm({ ...form, customPhases: [...form.customPhases, { title: '', ownership: 0 }] })}
+                    style={{ fontSize: 13, color: 'var(--blue)', cursor: 'pointer', padding: '6px 0' }}
+                  >
+                    + Add phase
+                  </button>
+                  {form.customPhases[form.customPhases.length - 1]?.ownership !== 100 && (
+                    <span style={{ fontSize: 12, color: '#FF3B30', alignSelf: 'center' }}>Final phase must be 100%</span>
+                  )}
                 </div>
 
                 <label className="row hair gap-3" style={{ padding: 16, borderRadius: 8, alignItems: 'flex-start', cursor: 'pointer' }}>
                   <input type="checkbox" checked={form.phasedAccepted} onChange={e => setForm({ ...form, phasedAccepted: e.target.checked })}
                     style={{ width: 16, height: 16, accentColor: 'var(--blue)', marginTop: 2 }} />
-                  <span style={{ fontSize: 13 }}>I agree to use the SafeBusinessSelling 3-phase ownership template. I can negotiate specific KPIs with each buyer.</span>
+                  <span style={{ fontSize: 13 }}>I agree to use this phased ownership structure. I can negotiate specific KPIs with each buyer.</span>
                 </label>
               </div>
             )}
@@ -326,21 +651,44 @@ export function SellerOnboardingPage() {
                   </div>
                 </div>
 
-                <Button variant="primary" size="lg" onClick={() => router.push('/seller/dashboard')} iconRight={<Icon.Arrow size={14} />}>
-                  Submit for verification
-                </Button>
               </div>
             )}
 
-            {step < steps.length - 1 && (
-              <div className="row" style={{ justifyContent: 'space-between', paddingTop: 24, borderTop: '0.5px solid var(--border)' }}>
-                <Button variant="ghost" size="sm" onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>← Back</Button>
-                <div className="row gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setStep(step + 1)}>Skip for now</Button>
-                  <Button variant="primary" onClick={() => setStep(step + 1)} iconRight={<Icon.Arrow size={12} />}>Continue</Button>
+            {(() => {
+              const missing = [
+                !stepComplete.basics && 'Business basics',
+                !stepComplete.financials && 'Financials',
+                !stepComplete.verification && 'Verification docs',
+                !stepComplete.phased && 'Phased ownership',
+              ].filter(Boolean) as string[];
+              const allReady = missing.length === 0;
+              return (
+                <div className="col gap-3" style={{ paddingTop: 24, borderTop: '0.5px solid var(--border)' }}>
+                  {showMissing && !allReady && (
+                    <div style={{ background: '#FF3B3011', border: '0.5px solid #FF3B3044', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: '#FF3B30' }}>
+                      Still missing: {missing.join(', ')}
+                    </div>
+                  )}
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    disabled={submitting}
+                    onClick={() => {
+                      if (!allReady) {
+                        setShowMissing(true);
+                        setTimeout(() => setShowMissing(false), 3000);
+                      } else {
+                        handleSubmit();
+                      }
+                    }}
+                    iconRight={submitting ? undefined : <Icon.Arrow size={14} />}
+                    style={{ width: '100%' }}
+                  >
+                    {submitting ? 'Listing…' : 'List this business'}
+                  </Button>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       </section>
@@ -348,9 +696,56 @@ export function SellerOnboardingPage() {
   );
 }
 
+type SellerListing = {
+  id: string;
+  name: string;
+  sector: string;
+  location: string;
+  asking_price: number;
+  score: number;
+  status: string;
+  rejection_reason: string | null;
+  created_at: string;
+};
+
+function ListingStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; color: string; bg: string }> = {
+    pending_review: { label: 'Pending review', color: '#C8922A', bg: '#C8922A18' },
+    live:           { label: 'Live',           color: '#00A86B', bg: '#00A86B18' },
+    rejected:       { label: 'Rejected',       color: '#FF3B30', bg: '#FF3B3018' },
+    draft:          { label: 'Draft',          color: 'var(--muted)', bg: 'var(--surface-2)' },
+    under_offer:    { label: 'Under offer',    color: 'var(--blue)', bg: 'var(--blue)18' },
+    sold:           { label: 'Sold',           color: 'var(--subtle)', bg: 'var(--surface-2)' },
+  };
+  const s = map[status] ?? map.draft;
+  return (
+    <span style={{ fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 999, color: s.color, background: s.bg }}>
+      {s.label}
+    </span>
+  );
+}
+
 export function SellerDashboardPage() {
   const router = useRouter();
   const [section, setSection] = useState('overview');
+  const [myListings, setMyListings] = useState<SellerListing[]>([]);
+  const [listingsLoading, setListingsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadListings() {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase
+        .from('listings')
+        .select('id, name, sector, location, asking_price, score, status, rejection_reason, created_at')
+        .eq('seller_id', session.user.id)
+        .order('created_at', { ascending: false });
+      setMyListings((data ?? []) as SellerListing[]);
+      setListingsLoading(false);
+    }
+    loadListings();
+  }, []);
 
   const inbox = [
     { from: 'Marek Sokolski', preview: 'Hi — I run a freight ops business in Warsaw and...', date: '2h ago', unread: true, verified: true },
@@ -485,6 +880,52 @@ export function SellerDashboardPage() {
                   ))}
                 </div>
               </div>
+
+              {/* My listings */}
+              <div className="card col gap-4" style={{ padding: 24 }}>
+                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4>My listings</h4>
+                  <Button variant="primary" size="sm" onClick={() => router.push('/seller/onboarding')}>+ New listing</Button>
+                </div>
+
+                {listingsLoading ? (
+                  <div style={{ height: 60, background: 'var(--surface-2)', borderRadius: 8, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                ) : myListings.length === 0 ? (
+                  <div className="col" style={{ padding: '24px 0', alignItems: 'center', gap: 8, textAlign: 'center' }}>
+                    <p className="muted" style={{ fontSize: 13 }}>No listings yet. Create your first listing to get started.</p>
+                  </div>
+                ) : (
+                  <div className="col gap-2">
+                    {myListings.map(l => (
+                      <div key={l.id} className="row hair" style={{ padding: '14px 16px', borderRadius: 8, alignItems: 'center', gap: 16 }}>
+                        <div className="col gap-1" style={{ flex: 1 }}>
+                          <div className="row gap-3" style={{ alignItems: 'center' }}>
+                            <span style={{ fontSize: 14, fontWeight: 500 }}>{l.name || '(no name)'}</span>
+                            <ListingStatusBadge status={l.status} />
+                          </div>
+                          <span className="muted" style={{ fontSize: 12 }}>
+                            {l.sector}{l.location ? ` · ${l.location}` : ''}{l.asking_price ? ` · €${(l.asking_price / 1_000_000).toFixed(1)}M` : ''}
+                          </span>
+                          {l.status === 'rejected' && l.rejection_reason && (
+                            <div style={{ marginTop: 6, background: '#FF3B3011', border: '0.5px solid #FF3B3044', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#FF3B30' }}>
+                              Rejected: {l.rejection_reason}
+                            </div>
+                          )}
+                          {l.status === 'pending_review' && (
+                            <span style={{ fontSize: 12, color: '#C8922A', marginTop: 2 }}>
+                              Under review — you'll be notified when approved.
+                            </span>
+                          )}
+                        </div>
+                        {l.score != null && (
+                          <span className="tabular muted" style={{ fontSize: 13 }}>Score {l.score}%</span>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => router.push('/seller/onboarding')}>Edit</Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -585,20 +1026,7 @@ export function SellerDashboardPage() {
                   { label: 'AI-narrative approved', weight: 10, done: true },
                   { label: 'Data room populated', weight: 15, done: true },
                   { label: 'Phased ownership template signed', weight: 10, done: true },
-                  { label: 'Premium upgrade', weight: 5, done: false },
                 ]} />
-              </div>
-
-              <div className="card col gap-4" style={{ padding: 28, flex: 1 }}>
-                <PremiumBadge />
-                <h4>Reach 100% with Premium</h4>
-                <p className="muted" style={{ fontSize: 13 }}>Premium listings appear at the top of the marketplace and in AI match shortlists.</p>
-                <ul className="col gap-2" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                  {['Featured placement', 'Gold premium badge', 'Priority verification (48h)', 'Dedicated advisor'].map(x => (
-                    <li key={x} className="row gap-2" style={{ fontSize: 13 }}><Icon.Check size={11} color="#C8922A" /> {x}</li>
-                  ))}
-                </ul>
-                <Button variant="primary" size="sm">Upgrade for €2,400</Button>
               </div>
             </div>
           )}
@@ -608,15 +1036,119 @@ export function SellerDashboardPage() {
   );
 }
 
+type BuyerDeal = {
+  id: string;
+  listing: string;
+  seller: string;
+  phase: number;
+  status: string;
+  sellerPhases: { title: string; ownership: number }[];
+  proposedPhases: { title: string; ownership: number }[] | null;
+  proposalSent: boolean;
+};
+
+const MOCK_BUYER_DEALS: BuyerDeal[] = [
+  {
+    id: '1',
+    listing: 'Northwind Logistics BV',
+    seller: 'Pieter van Dam',
+    phase: 1,
+    status: 'NDA signed · escrow funded',
+    sellerPhases: [
+      { title: 'LOI & Discovery', ownership: 0 },
+      { title: 'Operating handover', ownership: 51 },
+      { title: 'Full ownership', ownership: 100 },
+    ],
+    proposedPhases: null,
+    proposalSent: false,
+  },
+];
+
 export function BuyerDashboardPage() {
   const router = useRouter();
   const [section, setSection] = useState('matches');
+  const [user, setUser] = useState<User | null>(null);
+  const [matches, setMatches] = useState<AiMatch[]>([]);
+  const [saved, setSaved] = useState<SavedRow[]>([]);
+  const [ndas, setNdas] = useState<NdaRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deals, setDeals] = useState<BuyerDeal[]>(MOCK_BUYER_DEALS);
+  const [proposingFor, setProposingFor] = useState<string | null>(null);
 
-  const deals = [
-    { listing: LISTINGS[0], phase: 1, status: 'NDA signed · escrow funded', amount: '€5,000', next: 'Data room access opening today' },
-    { listing: LISTINGS[1], phase: 2, status: 'Operating handover · month 3 of 6', amount: '€428,000', next: 'Q1 KPI gate review in 18 days' },
-    { listing: LISTINGS[7], phase: 1, status: 'NDA pending counter-signature', amount: '€5,000', next: 'Awaiting seller signature' },
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push('/sign-in'); return; }
+      setUser(session.user);
+
+      const [{ data: savedData }, { data: ndaData }] = await Promise.all([
+        supabase.from('saved_listings').select('*, listings(*)').eq('buyer_id', session.user.id),
+        supabase.from('ndas').select('id, listing_id, status').eq('buyer_id', session.user.id),
+      ]);
+      setSaved((savedData ?? []) as SavedRow[]);
+      setNdas((ndaData ?? []) as NdaRow[]);
+
+      try {
+        const raw = sessionStorage.getItem('sbs_matches');
+        if (raw) setMatches(JSON.parse(raw));
+      } catch {}
+
+      setLoading(false);
+    }
+    load();
+  }, [router]);
+
+  async function toggleSave(listingId: string) {
+    if (!user) return;
+    const supabase = createClient();
+    const existing = saved.find(s => s.listing_id === listingId);
+    if (existing) {
+      await supabase.from('saved_listings').delete().eq('id', existing.id);
+      setSaved(prev => prev.filter(s => s.listing_id !== listingId));
+    } else {
+      const { data } = await supabase
+        .from('saved_listings')
+        .insert({ buyer_id: user.id, listing_id: listingId })
+        .select('*, listings(*)')
+        .single();
+      if (data) setSaved(prev => [...prev, data as SavedRow]);
+    }
+  }
+
+  async function requestNda(listingId: string, sellerId: string) {
+    if (!user) return;
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('ndas')
+      .insert({ listing_id: listingId, buyer_id: user.id, seller_id: sellerId })
+      .select('id, listing_id, status')
+      .single();
+    if (data) setNdas(prev => [...prev, data as NdaRow]);
+  }
+
+  const displayName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'there';
+  const savedCards = saved.map(s => dbToCard(s.listings));
+
+  const tabs = [
+    { id: 'matches', l: 'AI matches', n: matches.length || null },
+    { id: 'deals', l: 'Active deals', n: null },
+    { id: 'payments', l: 'Payments & escrow', n: null },
+    { id: 'saved', l: 'Saved listings', n: saved.length || null },
   ];
+
+  if (loading) {
+    return (
+      <div className="page-enter">
+        <section style={{ padding: '32px 0 96px' }}>
+          <div className="container col gap-4">
+            <div style={{ height: 60, background: 'var(--surface-2)', borderRadius: 10, animation: 'pulse 1.5s ease-in-out infinite' }} />
+            <div style={{ height: 200, background: 'var(--surface-2)', borderRadius: 10, animation: 'pulse 1.5s ease-in-out infinite' }} />
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="page-enter">
@@ -625,7 +1157,7 @@ export function BuyerDashboardPage() {
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 16 }}>
             <div className="col gap-2">
               <SectionEyebrow>Buying</SectionEyebrow>
-              <h1 style={{ fontSize: 36 }}>Welcome back, Marek</h1>
+              <h1 style={{ fontSize: 36 }}>Welcome back, {displayName}</h1>
             </div>
             <AccountTabs />
           </div>
@@ -638,12 +1170,7 @@ export function BuyerDashboardPage() {
 
       <section className="hair-b" style={{ padding: '24px 0' }}>
         <div className="container row gap-6">
-          {[
-            { id: 'matches', l: 'AI matches', n: 3 },
-            { id: 'deals', l: 'Active deals', n: 3 },
-            { id: 'payments', l: 'Payments & escrow' },
-            { id: 'saved', l: 'Saved listings', n: 7 },
-          ].map(t => (
+          {tabs.map(t => (
             <button key={t.id} onClick={() => setSection(t.id)} className="row gap-2"
               style={{
                 fontSize: 13, fontWeight: 500,
@@ -652,7 +1179,9 @@ export function BuyerDashboardPage() {
                 borderBottom: section === t.id ? '1.5px solid var(--fg)' : '1.5px solid transparent',
               }}>
               <span>{t.l}</span>
-              {t.n && <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 999, background: 'var(--surface-2)', color: 'var(--subtle)' }}>{t.n}</span>}
+              {t.n != null && t.n > 0 && (
+                <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 999, background: 'var(--surface-2)', color: 'var(--subtle)' }}>{t.n}</span>
+              )}
             </button>
           ))}
         </div>
@@ -660,150 +1189,245 @@ export function BuyerDashboardPage() {
 
       <section style={{ padding: '32px 0 96px' }}>
         <div className="container">
+
           {section === 'matches' && (
             <div className="col gap-4">
               <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                  <p style={{ fontSize: 14 }}>{MATCHES.length} matches based on your buyer profile</p>
-                  <p className="muted" style={{ fontSize: 12 }}>Updated 4 hours ago · Re-runs daily</p>
+                  <p style={{ fontSize: 14 }}>{matches.length} matches based on your buyer profile</p>
+                  <p className="muted" style={{ fontSize: 12 }}>Re-runs every time you chat with Ahmed AI</p>
                 </div>
                 <Button href="/" variant="ghost" size="sm">Refine with Ahmed AI →</Button>
               </div>
 
-              <div className="col gap-3">
-                {MATCHES.map(m => (
-                  <div key={m.listing.id} className="card row" style={{ padding: 0, overflow: 'hidden' }}>
-                    <div className="img-ph" style={{ width: 180, borderRadius: 0, borderRight: '0.5px solid var(--border)' }} />
-                    <div className="col gap-3" style={{ flex: 1, padding: 24 }}>
-                      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div className="col gap-2">
-                          <div className="row gap-2">{m.listing.verified && <VerifiedBadge />}{m.listing.premium && <PremiumBadge />}</div>
-                          <h4>{m.listing.name}</h4>
-                          <span className="muted" style={{ fontSize: 12 }}>{m.listing.sector} · {m.listing.location} · {m.listing.revenue}</span>
-                        </div>
-                        <div className="col" style={{ alignItems: 'flex-end', gap: 4 }}>
-                          <span className="tabular" style={{ fontSize: 28, fontWeight: 500, letterSpacing: -0.8 }}>{m.fit}</span>
-                          <span className="muted" style={{ fontSize: 11 }}>fit</span>
-                        </div>
-                      </div>
-                      <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
-                        {m.reasons.slice(0, 3).map(r => (
-                          <span key={r} className="row gap-2" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: 'var(--surface-2)', color: 'var(--subtle)' }}>
-                            <Icon.Check size={10} color="#00A86B" /> {r}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="row gap-2" style={{ marginTop: 4 }}>
-                        <Button href={`/listing/${m.listing.id}`} variant="primary" size="sm">View listing</Button>
-                        <Button variant="secondary" size="sm">Request NDA</Button>
-                      </div>
-                    </div>
+              {matches.length === 0 ? (
+                <div className="col" style={{ padding: '64px 0', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--surface-2)', display: 'grid', placeItems: 'center' }}>
+                    <Icon.Sparkle size={20} />
                   </div>
-                ))}
-              </div>
+                  <div className="col gap-2">
+                    <p style={{ fontSize: 16, fontWeight: 500, margin: 0 }}>No matches yet</p>
+                    <p className="muted" style={{ fontSize: 13, maxWidth: 360, margin: 0 }}>Chat with Ahmed AI to tell us what you're looking for. We'll score every listing against your profile.</p>
+                  </div>
+                  <Button href="/" variant="primary" iconRight={<Icon.Arrow size={12} />}>Start with Ahmed AI</Button>
+                </div>
+              ) : (
+                <div className="col gap-3">
+                  {matches.map(m => {
+                    const l = m.listing;
+                    const ndaForListing = ndas.find(n => n.listing_id === String(l.id));
+                    return (
+                      <div key={m.id} className="card row" style={{ padding: 0, overflow: 'hidden' }}>
+                        <div className="img-ph" style={{ width: 180, borderRadius: 0, borderRight: '0.5px solid var(--border)' }} />
+                        <div className="col gap-3" style={{ flex: 1, padding: 24 }}>
+                          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div className="col gap-2">
+                              <div className="row gap-2">
+                                {Boolean(l.verified) && <VerifiedBadge />}
+                              </div>
+                              <h4>{String(l.name ?? '')}</h4>
+                              <span className="muted" style={{ fontSize: 12 }}>
+                                {String(l.sector ?? '')} · {String(l.location ?? '')} · {typeof l.asking_price === 'number' ? formatEur(l.asking_price) : String(l.asking ?? '')}
+                              </span>
+                            </div>
+                            <div className="col" style={{ alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                              <span className="tabular" style={{ fontSize: 28, fontWeight: 500, letterSpacing: -0.8, color: m.fit >= 80 ? 'var(--green)' : 'var(--fg)' }}>{m.fit}</span>
+                              <span className="muted" style={{ fontSize: 11 }}>/ 100 fit</span>
+                            </div>
+                          </div>
+                          <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
+                            {m.reasons.slice(0, 3).map(r => (
+                              <span key={r} className="row gap-2" style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: 'var(--surface-2)', color: 'var(--subtle)' }}>
+                                <Icon.Check size={10} color="#00A86B" /> {r}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="row gap-2" style={{ marginTop: 4 }}>
+                            <Button href={`/listing/${String(l.id ?? '')}`} variant="primary" size="sm">View listing</Button>
+                            {!ndaForListing && (
+                              <Button variant="secondary" size="sm" onClick={() => requestNda(String(l.id), String(l.seller_id ?? ''))}>
+                                Request NDA
+                              </Button>
+                            )}
+                            {ndaForListing?.status === 'pending' && <span className="badge">NDA pending</span>}
+                            {ndaForListing?.status === 'fully_signed' && <span className="badge badge-verified"><Icon.Check size={10} /> NDA signed</span>}
+                            <button onClick={() => toggleSave(String(l.id))} style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)', cursor: 'pointer' }}>
+                              {saved.find(s => s.listing_id === String(l.id)) ? '★ Saved' : '☆ Save'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
           {section === 'deals' && (
             <div className="col gap-4">
-              {deals.map((d, i) => (
-                <div key={i} className="card col gap-6" style={{ padding: 28 }}>
+              {deals.length === 0 ? (
+                <div className="col" style={{ padding: '64px 0', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--surface-2)', display: 'grid', placeItems: 'center' }}>
+                    <Icon.Building size={20} />
+                  </div>
+                  <div className="col gap-2">
+                    <p style={{ fontSize: 16, fontWeight: 500, margin: 0 }}>No active deals</p>
+                    <p className="muted" style={{ fontSize: 13, maxWidth: 360, margin: 0 }}>
+                      Once you express interest and sign an NDA, your active deals appear here with phase tracking and escrow status.
+                    </p>
+                  </div>
+                  <Button href="/marketplace" variant="primary" iconRight={<Icon.Arrow size={12} />}>Browse marketplace</Button>
+                </div>
+              ) : deals.map(d => (
+                <div key={d.id} className="card col gap-6" style={{ padding: 28 }}>
                   <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div className="row gap-4">
-                      <div className="img-ph" style={{ width: 60, height: 60, borderRadius: 8 }} />
+                    <div className="col gap-1">
+                      <span style={{ fontSize: 15, fontWeight: 500 }}>{d.listing}</span>
+                      <span className="muted" style={{ fontSize: 12 }}>Seller: {d.seller} · {d.status}</span>
+                    </div>
+                    <Button variant="secondary" size="sm" icon={<Icon.Message size={12} />}>Message seller</Button>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500, marginBottom: 12, display: 'block' }}>
+                      {d.proposalSent ? 'Your proposed structure (pending seller approval)' : "Seller's phased ownership structure"}
+                    </span>
+                    <PhaseTracker phases={d.proposalSent && d.proposedPhases ? d.proposedPhases : d.sellerPhases} currentPhase={d.phase} />
+                  </div>
+
+                  {d.proposalSent && (
+                    <div className="row gap-2" style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--surface-2)', fontSize: 13 }}>
+                      <span className="muted">Proposal sent — waiting for seller to respond.</span>
+                    </div>
+                  )}
+
+                  {!d.proposalSent && proposingFor !== d.id && (
+                    <button
+                      onClick={() => {
+                        setDeals(prev => prev.map(x => x.id === d.id ? { ...x, proposedPhases: x.sellerPhases.map(p => ({ ...p })) } : x));
+                        setProposingFor(d.id);
+                      }}
+                      style={{ fontSize: 13, color: 'var(--blue)', cursor: 'pointer', alignSelf: 'flex-start' }}
+                    >
+                      + Propose different structure
+                    </button>
+                  )}
+
+                  {proposingFor === d.id && d.proposedPhases && (
+                    <div className="col gap-4 hair" style={{ padding: 20, borderRadius: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 500 }}>Your proposed structure</span>
+
                       <div className="col gap-2">
-                        <div className="row gap-2">{d.listing.verified && <VerifiedBadge />}{d.listing.premium && <PremiumBadge />}</div>
-                        <h4>{d.listing.name}</h4>
-                        <span className="muted" style={{ fontSize: 12 }}>{d.listing.sector} · {d.listing.location}</span>
+                        {d.proposedPhases.map((p, i) => (
+                          <div key={i} className="row hair gap-3" style={{ padding: '10px 14px', borderRadius: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--muted)', minWidth: 20 }}>{i + 1}</span>
+                            <input
+                              value={p.title}
+                              onChange={e => setDeals(prev => prev.map(x => x.id !== d.id ? x : {
+                                ...x,
+                                proposedPhases: x.proposedPhases!.map((pp, j) => j === i ? { ...pp, title: e.target.value } : pp),
+                              }))}
+                              placeholder="Phase name"
+                              style={{ flex: 1, fontSize: 13, background: 'transparent', border: 'none', outline: 'none', color: 'var(--fg)' }}
+                            />
+                            <div className="row gap-1" style={{ alignItems: 'center' }}>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={p.ownership}
+                                onChange={e => setDeals(prev => prev.map(x => x.id !== d.id ? x : {
+                                  ...x,
+                                  proposedPhases: x.proposedPhases!.map((pp, j) => j === i ? { ...pp, ownership: Number(e.target.value) } : pp),
+                                }))}
+                                style={{ width: 54, fontSize: 13, textAlign: 'right', background: 'transparent', border: 'none', outline: 'none', color: 'var(--fg)' }}
+                              />
+                              <span className="muted" style={{ fontSize: 13 }}>%</span>
+                            </div>
+                            {d.proposedPhases!.length > 1 && (
+                              <button
+                                onClick={() => setDeals(prev => prev.map(x => x.id !== d.id ? x : {
+                                  ...x,
+                                  proposedPhases: x.proposedPhases!.filter((_, j) => j !== i),
+                                }))}
+                                style={{ fontSize: 16, color: 'var(--muted)', cursor: 'pointer', padding: '0 4px' }}
+                              >×</button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => setDeals(prev => prev.map(x => x.id !== d.id ? x : {
+                          ...x,
+                          proposedPhases: [...x.proposedPhases!, { title: '', ownership: 0 }],
+                        }))}
+                        style={{ fontSize: 13, color: 'var(--blue)', cursor: 'pointer', alignSelf: 'flex-start' }}
+                      >
+                        + Add phase
+                      </button>
+
+                      {d.proposedPhases[d.proposedPhases.length - 1]?.ownership !== 100 && (
+                        <span style={{ fontSize: 12, color: '#FF3B30' }}>Final phase must be 100%</span>
+                      )}
+
+                      <div className="row gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={d.proposedPhases[d.proposedPhases.length - 1]?.ownership !== 100}
+                          onClick={() => {
+                            setDeals(prev => prev.map(x => x.id === d.id ? { ...x, proposalSent: true } : x));
+                            setProposingFor(null);
+                          }}
+                        >
+                          Send proposal to seller
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => { setProposingFor(null); }}>Cancel</Button>
                       </div>
                     </div>
-                    <Button href={`/listing/${d.listing.id}`} variant="secondary" size="sm" iconRight={<Icon.ArrowUpRight size={11} />}>Open deal</Button>
-                  </div>
-
-                  <PhaseTracker phases={PHASES} currentPhase={d.phase} />
-
-                  <div className="row hair" style={{ padding: 16, borderRadius: 8, gap: 24, alignItems: 'center' }}>
-                    <div className="col" style={{ gap: 2, minWidth: 220 }}>
-                      <span className="muted" style={{ fontSize: 11 }}>Status</span>
-                      <span style={{ fontSize: 13 }}>{d.status}</span>
-                    </div>
-                    <div className="col" style={{ gap: 2, minWidth: 160 }}>
-                      <span className="muted" style={{ fontSize: 11 }}>In escrow</span>
-                      <span className="tabular" style={{ fontSize: 14, fontWeight: 500 }}>{d.amount}</span>
-                    </div>
-                    <div className="col" style={{ gap: 2, flex: 1 }}>
-                      <span className="muted" style={{ fontSize: 11 }}>Next step</span>
-                      <span style={{ fontSize: 13 }}>{d.next}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
           {section === 'payments' && (
-            <div className="col gap-6">
-              <div className="row" style={{ gap: 0, border: '0.5px solid var(--border)', borderRadius: 10 }}>
-                {[
-                  { k: 'In escrow', v: '€438K', d: 'Across 3 active deals' },
-                  { k: 'Released to date', v: '€718K', d: 'Phase 1 + 2 closures' },
-                  { k: 'Pending milestone', v: '€280K', d: 'Q1 KPI gate · 18 days' },
-                ].map((m, i) => (
-                  <div key={i} className="col gap-2" style={{ flex: 1, padding: 24, borderRight: i < 2 ? '0.5px solid var(--border)' : 'none' }}>
-                    <span className="muted" style={{ fontSize: 12 }}>{m.k}</span>
-                    <span className="tabular" style={{ fontSize: 32, fontWeight: 500, letterSpacing: -1 }}>{m.v}</span>
-                    <span className="muted" style={{ fontSize: 11 }}>{m.d}</span>
-                  </div>
-                ))}
+            <div className="col" style={{ padding: '64px 0', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--surface-2)', display: 'grid', placeItems: 'center' }}>
+                <Icon.Lock size={20} />
               </div>
-
-              <div className="card col" style={{ padding: 0, overflow: 'hidden' }}>
-                <div className="row" style={{ padding: 24, borderBottom: '0.5px solid var(--border)', justifyContent: 'space-between' }}>
-                  <h4>Recent transactions</h4>
-                  <Button variant="ghost" size="sm">Download CSV</Button>
-                </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: 'var(--surface-2)' }}>
-                      <th style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 500, color: 'var(--muted)', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>Date</th>
-                      <th style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 500, color: 'var(--muted)', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>Deal</th>
-                      <th style={{ padding: '12px 24px', textAlign: 'left', fontWeight: 500, color: 'var(--muted)', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>Type</th>
-                      <th style={{ padding: '12px 24px', textAlign: 'right', fontWeight: 500, color: 'var(--muted)', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>Amount</th>
-                      <th style={{ padding: '12px 24px', textAlign: 'right', fontWeight: 500, color: 'var(--muted)', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      ['12 May 2026', 'Halcyon Skincare', 'Phase 2 release', '€428,000', 'cleared'],
-                      ['08 May 2026', 'Northwind Logistics', 'NDA escrow deposit', '€5,000', 'held'],
-                      ['02 May 2026', 'Vesper Coffee Roasters', 'NDA escrow deposit', '€5,000', 'held'],
-                      ['28 Apr 2026', 'Halcyon Skincare', 'Phase 1 release', '€290,000', 'cleared'],
-                      ['21 Apr 2026', 'Halcyon Skincare', 'Closing payment', '€700,000', 'cleared'],
-                    ].map((r, i) => (
-                      <tr key={i} style={{ borderTop: '0.5px solid var(--border)' }}>
-                        <td style={{ padding: '14px 24px', color: 'var(--subtle)' }}>{r[0]}</td>
-                        <td style={{ padding: '14px 24px', fontWeight: 500 }}>{r[1]}</td>
-                        <td style={{ padding: '14px 24px', color: 'var(--subtle)' }}>{r[2]}</td>
-                        <td className="tabular" style={{ padding: '14px 24px', textAlign: 'right', fontWeight: 500 }}>{r[3]}</td>
-                        <td style={{ padding: '14px 24px', textAlign: 'right' }}>
-                          <span className="badge" style={{ color: r[4] === 'cleared' ? 'var(--green)' : 'var(--subtle)' }}>
-                            {r[4] === 'cleared' ? <Icon.Check size={10} /> : <Icon.Lock size={10} />}
-                            {r[4]}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="col gap-2">
+                <p style={{ fontSize: 16, fontWeight: 500, margin: 0 }}>No transactions yet</p>
+                <p className="muted" style={{ fontSize: 13, maxWidth: 360, margin: 0 }}>
+                  Your escrow payments and transaction history will appear here once you start a deal.
+                </p>
               </div>
             </div>
           )}
 
           {section === 'saved' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              {LISTINGS.slice(0, 6).map(l => <ListingCard key={l.id} listing={l} href={`/listing/${l.id}`} />)}
-            </div>
+            savedCards.length === 0 ? (
+              <div className="col" style={{ padding: '64px 0', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--surface-2)', display: 'grid', placeItems: 'center' }}>
+                  <Icon.Bookmark size={20} />
+                </div>
+                <div className="col gap-2">
+                  <p style={{ fontSize: 16, fontWeight: 500, margin: 0 }}>No saved listings</p>
+                  <p className="muted" style={{ fontSize: 13, maxWidth: 360, margin: 0 }}>
+                    Save listings from the marketplace or your AI matches to compare them later.
+                  </p>
+                </div>
+                <Button href="/marketplace" variant="primary" iconRight={<Icon.Arrow size={12} />}>Browse marketplace</Button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                {savedCards.map(l => <ListingCard key={l.id} listing={l} href={`/listing/${l.id}`} />)}
+              </div>
+            )
           )}
+
         </div>
       </section>
     </div>

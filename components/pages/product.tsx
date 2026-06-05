@@ -1,31 +1,113 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Icon, VerifiedBadge, PremiumBadge, ScoreBar, PhaseTracker, ListingCard, SectionEyebrow } from '@/components/ui';
-import { LISTINGS, SECTORS, REVENUE_RANGES, PHASES, REVIEWS } from '@/lib/data';
+import { Button, Icon, VerifiedBadge, ScoreBar, PhaseTracker, ListingCard, SectionEyebrow } from '@/components/ui';
+import { SECTORS, PHASES, REVIEWS } from '@/lib/data';
+import type { Listing } from '@/lib/data';
+import { createClient } from '@/lib/supabase-browser';
 
-export function MarketplacePage() {
-  const [sector, setSector] = useState('All sectors');
-  const [revRange, setRevRange] = useState('Any revenue');
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [premiumOnly, setPremiumOnly] = useState(false);
-  const [minScore, setMinScore] = useState(0);
-  const [sort, setSort] = useState('score');
-  const [q, setQ] = useState('');
+const PRICE_RANGES = [
+  { label: 'Any price', min: 0, max: 0 },
+  { label: '< €500K', min: 0, max: 500_000 },
+  { label: '€500K – €1M', min: 500_000, max: 1_000_000 },
+  { label: '€1M – €5M', min: 1_000_000, max: 5_000_000 },
+  { label: '€5M+', min: 5_000_000, max: 0 },
+];
 
-  const filtered = useMemo(() => {
-    let f = LISTINGS.filter(l =>
-      (sector === 'All sectors' || l.sector === sector) &&
-      (!verifiedOnly || l.verified) &&
-      (!premiumOnly || l.premium) &&
-      l.score >= minScore &&
-      (q === '' || l.name.toLowerCase().includes(q.toLowerCase()) || l.sector.toLowerCase().includes(q.toLowerCase()))
-    );
-    if (sort === 'score') f = [...f].sort((a, b) => b.score - a.score);
-    if (sort === 'newest') f = [...f].sort((a, b) => a.id < b.id ? 1 : -1);
-    return f;
-  }, [sector, verifiedOnly, premiumOnly, minScore, sort, q]);
+function formatEur(n: number): string {
+  if (n >= 1_000_000) return `€${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `€${Math.round(n / 1_000)}K`;
+  return `€${n}`;
+}
+
+type DbListing = {
+  id: string; name: string; sector: string; location: string;
+  revenue: number; ebitda: number; asking_price: number;
+  description: string | null; score: number; verified: boolean;
+  photos: string[];
+};
+
+function toCard(r: DbListing): Listing {
+  return {
+    id: r.id, name: r.name, sector: r.sector, location: r.location,
+    revenue: formatEur(r.revenue),
+    ebitda: r.ebitda ? formatEur(r.ebitda) : undefined,
+    asking: formatEur(r.asking_price),
+    score: r.score, verified: r.verified,
+    photos: r.photos?.length ?? 0,
+    description: r.description ?? '',
+  };
+}
+
+export function MarketplacePage({ searchParams = {} }: { searchParams?: Record<string, string> }) {
+  const router = useRouter();
+
+  const [q, setQ] = useState(searchParams.q ?? '');
+  const [sector, setSector] = useState(searchParams.sector ?? 'All sectors');
+  const [priceRange, setPriceRange] = useState(searchParams.price ?? 'Any price');
+  const [verifiedOnly, setVerifiedOnly] = useState(searchParams.verified === 'true');
+const [sort, setSort] = useState(searchParams.sort ?? 'score');
+
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function pushUrl(overrides: Record<string, string>) {
+    const p: Record<string, string> = { q, sector, price: priceRange, sort, verified: String(verifiedOnly), ...overrides };
+    const sp = new URLSearchParams();
+    if (p.q) sp.set('q', p.q);
+    if (p.sector && p.sector !== 'All sectors') sp.set('sector', p.sector);
+    if (p.price && p.price !== 'Any price') sp.set('price', p.price);
+    if (p.sort && p.sort !== 'score') sp.set('sort', p.sort);
+    if (p.verified === 'true') sp.set('verified', 'true');
+    const qs = sp.toString();
+    router.replace(qs ? `/marketplace?${qs}` : '/marketplace', { scroll: false });
+  }
+
+  const fetchListings = useCallback(async (search: string) => {
+    setLoading(true);
+    const supabase = createClient();
+    const range = PRICE_RANGES.find(r => r.label === priceRange) ?? PRICE_RANGES[0];
+
+    let query = supabase
+      .from('listings')
+      .select('id,name,sector,location,revenue,ebitda,asking_price,description,score,verified,photos', { count: 'exact' })
+      .eq('status', 'live');
+
+    if (search.trim()) query = query.or(`name.ilike.%${search.trim()}%,description.ilike.%${search.trim()}%`);
+    if (sector !== 'All sectors') query = query.eq('sector', sector);
+    if (range.min > 0) query = query.gte('asking_price', range.min);
+    if (range.max > 0) query = query.lte('asking_price', range.max);
+    if (verifiedOnly) query = query.eq('verified', true);
+
+    if (sort === 'score') query = query.order('score', { ascending: false });
+    else if (sort === 'price_asc') query = query.order('asking_price', { ascending: true });
+    else if (sort === 'price_desc') query = query.order('asking_price', { ascending: false });
+    else if (sort === 'newest') query = query.order('created_at', { ascending: false });
+
+    const { data, count } = await query;
+    setListings((data ?? []).map(r => toCard(r as DbListing)));
+    setTotal(count ?? 0);
+    setLoading(false);
+  }, [sector, priceRange, verifiedOnly, sort]);
+
+  // Debounce search input, immediate for other filters
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchListings(q), 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [q, fetchListings]);
+
+  function resetFilters() {
+    setQ(''); setSector('All sectors'); setPriceRange('Any price');
+    setVerifiedOnly(false); setSort('score');
+    router.replace('/marketplace', { scroll: false });
+  }
+
+  const hasActiveFilters = q || sector !== 'All sectors' || priceRange !== 'Any price' || verifiedOnly;
 
   return (
     <div className="page-enter">
@@ -33,20 +115,28 @@ export function MarketplacePage() {
         <div className="container col gap-3">
           <SectionEyebrow>Marketplace</SectionEyebrow>
           <div className="row mobile-wrap" style={{ justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
-            <h1 style={{ fontSize: 48 }}>{filtered.length} verified businesses</h1>
+            <h1 style={{ fontSize: 48 }}>
+              {loading ? '…' : total} verified {total === 1 ? 'business' : 'businesses'}
+            </h1>
             <div className="row gap-3 mobile-full" style={{ flex: 1, minWidth: 0 }}>
               <div className="row hair" style={{ padding: '0 12px', height: 36, borderRadius: 8, gap: 8, flex: 1, minWidth: 0 }}>
                 <Icon.Search size={14} />
                 <input
                   value={q}
-                  onChange={e => setQ(e.target.value)}
-                  placeholder="Search by name or sector"
+                  onChange={e => { setQ(e.target.value); pushUrl({ q: e.target.value }); }}
+                  placeholder="Search by name or description"
                   style={{ border: 'none', padding: 0, height: '100%', background: 'transparent', fontSize: 13 }}
                 />
               </div>
-              <select value={sort} onChange={e => setSort(e.target.value)} style={{ height: 36, padding: '0 12px', fontSize: 13, width: 'auto', appearance: 'none', background: 'transparent' }}>
+              <select
+                value={sort}
+                onChange={e => { setSort(e.target.value); pushUrl({ sort: e.target.value }); }}
+                style={{ height: 36, padding: '0 12px', fontSize: 13, width: 'auto', appearance: 'none', background: 'transparent' }}
+              >
                 <option value="score">Sort: Listing score</option>
                 <option value="newest">Sort: Newest first</option>
+                <option value="price_asc">Sort: Price ↑</option>
+                <option value="price_desc">Sort: Price ↓</option>
               </select>
             </div>
           </div>
@@ -57,30 +147,29 @@ export function MarketplacePage() {
         <div className="container col gap-3">
           <div className="row gap-2 scroll-x">
             {SECTORS.map(s => (
-              <button key={s} className={`chip ${sector === s ? 'active' : ''}`} onClick={() => setSector(s)}>{s}</button>
+              <button key={s} className={`chip ${sector === s ? 'active' : ''}`}
+                onClick={() => { setSector(s); pushUrl({ sector: s }); }}>{s}</button>
             ))}
           </div>
           <div className="row" style={{ justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div className="row gap-2">
-              {REVENUE_RANGES.map(r => (
-                <button key={r} className={`chip ${revRange === r ? 'active' : ''}`} onClick={() => setRevRange(r)}>{r}</button>
+              {PRICE_RANGES.map(r => (
+                <button key={r.label} className={`chip ${priceRange === r.label ? 'active' : ''}`}
+                  onClick={() => { setPriceRange(r.label); pushUrl({ price: r.label }); }}>{r.label}</button>
               ))}
             </div>
             <div className="row gap-3">
               <label className="row gap-2" style={{ fontSize: 13, cursor: 'pointer', color: verifiedOnly ? 'var(--fg)' : 'var(--subtle)' }}>
-                <input type="checkbox" checked={verifiedOnly} onChange={e => setVerifiedOnly(e.target.checked)} style={{ width: 14, height: 14, accentColor: 'var(--blue)' }} />
+                <input type="checkbox" checked={verifiedOnly}
+                  onChange={e => { setVerifiedOnly(e.target.checked); pushUrl({ verified: String(e.target.checked) }); }}
+                  style={{ width: 14, height: 14, accentColor: 'var(--blue)' }} />
                 Verified only
               </label>
-              <label className="row gap-2" style={{ fontSize: 13, cursor: 'pointer', color: premiumOnly ? 'var(--fg)' : 'var(--subtle)' }}>
-                <input type="checkbox" checked={premiumOnly} onChange={e => setPremiumOnly(e.target.checked)} style={{ width: 14, height: 14, accentColor: 'var(--blue)' }} />
-                Premium only
-              </label>
-              <div className="row gap-2" style={{ fontSize: 13 }}>
-                <span className="muted">Min score</span>
-                <input type="range" min="0" max="100" step="5" value={minScore} onChange={e => setMinScore(+e.target.value)}
-                  style={{ width: 100, accentColor: 'var(--blue)' }} />
-                <span className="tabular" style={{ minWidth: 32 }}>{minScore}%</span>
-              </div>
+              {hasActiveFilters && (
+                <button onClick={resetFilters} style={{ fontSize: 13, color: 'var(--subtle)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                  Reset filters
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -88,7 +177,13 @@ export function MarketplacePage() {
 
       <section style={{ padding: '40px 0 64px' }}>
         <div className="container">
-          {LISTINGS.length === 0 ? (
+          {loading ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} style={{ height: 280, background: 'var(--surface-2)', borderRadius: 12, animation: 'pulse 1.5s ease-in-out infinite' }} />
+              ))}
+            </div>
+          ) : listings.length === 0 && !hasActiveFilters ? (
             <div className="col" style={{ padding: '80px 0', alignItems: 'center', gap: 16, textAlign: 'center' }}>
               <div style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--surface)', border: '0.5px solid var(--hair)', display: 'grid', placeItems: 'center' }}>
                 <Icon.Building size={22} />
@@ -101,15 +196,15 @@ export function MarketplacePage() {
               </div>
               <Link href="/seller/onboarding" className="btn btn-primary">List your business</Link>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : listings.length === 0 ? (
             <div className="col" style={{ padding: 80, alignItems: 'center', gap: 12 }}>
               <Icon.Search size={24} />
               <p className="muted">No listings match these filters.</p>
-              <Button variant="secondary" size="sm" onClick={() => { setSector('All sectors'); setVerifiedOnly(false); setPremiumOnly(false); setMinScore(0); setQ(''); }}>Reset filters</Button>
+              <Button variant="secondary" size="sm" onClick={resetFilters}>Reset filters</Button>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              {filtered.map(l => (
+              {listings.map(l => (
                 <ListingCard key={l.id} listing={l} href={`/listing/${l.id}`} />
               ))}
             </div>
@@ -121,10 +216,46 @@ export function MarketplacePage() {
 }
 
 export function ListingPage({ listingId }: { listingId: string }) {
-  const listing = LISTINGS.find(l => l.id === listingId);
+  const [listing, setListing] = useState<Listing | null | undefined>(undefined);
   const [tab, setTab] = useState('overview');
 
-  if (!listing) return (
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('id', listingId)
+        .single();
+      if (!data) { setListing(null); return; }
+      setListing({
+        id: String(data.id),
+        name: data.name ?? '',
+        sector: data.sector ?? '',
+        location: data.location ?? '',
+        revenue: data.revenue ? `€${(Number(data.revenue) / 1_000_000).toFixed(1)}M` : '',
+        ebitda: data.ebitda ? `€${(Number(data.ebitda) / 1_000_000).toFixed(1)}M` : '',
+        asking: data.asking_price ? `€${(Number(data.asking_price) / 1_000_000).toFixed(1)}M` : '',
+        score: data.score ?? 0,
+        verified: !!data.verified,
+        founded: data.founded ? String(data.founded) : '',
+        employees: data.employees ? String(data.employees) : '',
+        photos: data.photos ?? 4,
+        description: data.description ?? '',
+      } as Listing);
+    }
+    load();
+  }, [listingId]);
+
+  if (listing === undefined) return (
+    <div className="page-enter">
+      <section style={{ padding: '80px 0', textAlign: 'center' }}>
+        <div className="container"><div style={{ height: 200, background: 'var(--surface-2)', borderRadius: 10, animation: 'pulse 1.5s ease-in-out infinite' }} /></div>
+      </section>
+    </div>
+  );
+
+  if (listing === null) return (
     <div className="page-enter">
       <section style={{ padding: '80px 0', textAlign: 'center' }}>
         <div className="container col gap-4" style={{ alignItems: 'center' }}>
@@ -144,7 +275,6 @@ export function ListingPage({ listingId }: { listingId: string }) {
     { label: 'AI-narrative approved', weight: 10, done: true },
     { label: 'Data room populated', weight: 15, done: listing.score >= 80 },
     { label: 'Phased ownership template signed', weight: 10, done: listing.score >= 85 },
-    { label: 'Premium upgrade', weight: 5, done: listing.premium },
   ];
 
   return (
@@ -166,7 +296,6 @@ export function ListingPage({ listingId }: { listingId: string }) {
           <div className="col gap-4" style={{ maxWidth: 720 }}>
             <div className="row gap-2">
               {listing.verified && <VerifiedBadge />}
-              {listing.premium && <PremiumBadge />}
               <span className="badge badge-neutral">Listed 12 days ago</span>
             </div>
             <h1 style={{ fontSize: 48 }}>{listing.name}</h1>
@@ -486,7 +615,6 @@ export function AIMatchPage() {
                   <div className="col gap-2">
                     <div className="row gap-2">
                       {Boolean(l.verified) && <VerifiedBadge />}
-                      {Boolean(l.premium) && <PremiumBadge />}
                     </div>
                     <h3>{String(l.name ?? '')}</h3>
                     <div className="row gap-2 muted" style={{ fontSize: 12, flexWrap: 'wrap' }}>

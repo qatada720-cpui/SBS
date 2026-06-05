@@ -4,7 +4,19 @@ import { useRouter } from 'next/navigation';
 import { Button, Icon, SectionEyebrow, Stat, Field } from '@/components/ui';
 import { TEAM } from '@/lib/data';
 
-const AHMED_OPENING = "I'm Ahmed — I help buyers find verified businesses on SafeBusinessSelling. To find your best matches, I'll ask a few short questions. What sector or type of business are you looking at?";
+const AHMED_OPENING = "I'm Ahmed — senior M&A advisor at SafeBusinessSelling. I'll build your buyer profile through a short conversation, then score every verified listing against it.\n\nTo match you well, I'll ask about your target sector, budget, location, how hands-on you want to be post-close, and a few other deal factors. Takes about 5 minutes.\n\nWhat type of business are you looking to acquire?";
+
+const PROFILE_TOPICS = [
+  { key: 'sector',      label: 'Sector' },
+  { key: 'budget',      label: 'Budget' },
+  { key: 'financials',  label: 'Revenue / EBITDA' },
+  { key: 'location',    label: 'Location' },
+  { key: 'involvement', label: 'Your role post-close' },
+  { key: 'experience',  label: 'Experience' },
+  { key: 'timeline',    label: 'Timeline' },
+  { key: 'handover',    label: 'Seller handover' },
+  { key: 'dealbreakers',label: 'Deal-breakers' },
+];
 
 type ChatMessage = {
   from: string;
@@ -13,6 +25,35 @@ type ChatMessage = {
 };
 
 type GroqMessage = { role: 'user' | 'assistant'; content: string };
+
+const TOPIC_KEYWORDS: Record<string, string[]> = {
+  sector:       ['sector', 'industry', 'saas', 'e-commerce', 'ecommerce', 'logistics', 'logistiek', 'healthcare', 'zorg', 'food', 'eten', 'horeca', 'automotive', 'services', 'diensten', 'manufacturing', 'productie', 'hospitality', 'software', 'webshop', 'winkel', 'bedrijf', 'type'],
+  budget:       ['€', 'euro', 'million', 'miljoen', 'duizend', 'thousand', '000', 'budget', 'spend', 'uitgeven', 'betalen', 'kopen voor', 'max', 'ceiling', 'afford', '500k', '1m', '2m', '3m', '5m', 'k ', ' k', 'ton'],
+  financials:   ['revenue', 'omzet', 'winst', 'profit', 'ebitda', 'margin', 'marge', 'turnover', 'winstgevend', 'verlies', 'groeiend', 'groei', 'verdient', 'financial', 'financieel'],
+  location:     ['nederland', 'netherlands', 'nl', 'amsterdam', 'rotterdam', 'den haag', 'utrecht', 'eindhoven', 'belgium', 'belgie', 'duitsland', 'germany', 'europe', 'europa', 'remote', 'online', 'locatie', 'stad', 'land', 'city', 'country', 'regio', 'region'],
+  involvement:  ['runnen', 'runne', 'run', 'zelf', 'myself', 'full-time', 'fulltime', 'parttime', 'part-time', 'team', 'management', 'passief', 'passive', 'hands-on', 'operationeel', 'leiden', 'manage', 'day-to-day', 'dagelijks', 'strategic', 'investor'],
+  experience:   ['eerste', 'first', 'eerder', 'before', 'ervaring', 'experience', 'gekocht', 'bought', 'overnamen', 'vorig', 'previous', 'nooit', 'never', 'wel eens'],
+  timeline:     ['maanden', 'months', 'jaar', 'year', 'snel', 'quickly', 'wanneer', 'when', 'timeline', 'tijdlijn', 'half jaar', 'zo snel', 'as soon', 'deadline', 'haast', 'urgent'],
+  handover:     ['verkoper', 'seller', 'blijft', 'stays', 'overdracht', 'handover', 'overgang', 'transition', 'inwerkperiode', 'help', 'begeleiding', 'guidance', 'stay on', 'blijven'],
+  dealbreakers: ['niet', 'no ', 'geen', 'avoid', 'vermijden', 'nooit', 'never', 'liever niet', 'wil ik niet', 'skip', 'sla over', 'verliesgevend', 'loss', 'gereguleerd', 'regulated'],
+};
+
+function detectCoveredTopics(messages: ChatMessage[]): Set<string> {
+  const userText = messages.filter(m => m.from === 'user').map(m => m.text.toLowerCase()).join(' ');
+  const covered = new Set<string>();
+
+  // Keyword matching
+  for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
+    if (keywords.some(kw => userText.includes(kw))) covered.add(topic);
+  }
+
+  // Regex: detect any number that looks like a budget (e.g. "1.5", "500", "2,5 miljoen")
+  if (/\d[\d.,]*\s*(miljoen|million|k\b|duizend|thousand|m\b)/i.test(userText) || /€\s*\d/i.test(userText)) {
+    covered.add('budget');
+  }
+
+  return covered;
+}
 
 export function HomePage() {
   const router = useRouter();
@@ -26,6 +67,14 @@ export function HomePage() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const userAnswerCount = messages.filter((m) => m.from === 'user').length;
+  const coveredTopics = detectCoveredTopics(messages);
+  const topicsCount = coveredTopics.size;
+
+  // Prevent body scroll on home page
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -110,71 +159,122 @@ export function HomePage() {
   }, [navigating, thinking, groqHistory, router]);
 
   return (
-    <div className="page-enter" style={{ height: 'calc(100dvh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <section style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 0' }}>
-        <div className="col" style={{ width: '100%', maxWidth: 680, flex: 1, minHeight: 0 }}>
-          {/* Small header */}
-          <div className="row gap-3" style={{ alignItems: 'center', paddingBottom: 24 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--surface-2)', border: '0.5px solid var(--border)', display: 'grid', placeItems: 'center' }}>
-              <Icon.Sparkle size={13} />
+    <div className="page-enter" style={{
+      height: 'calc(100dvh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      background: 'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(37,99,235,0.07) 0%, transparent 70%)',
+    }}>
+      <section style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 0', minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ width: '100%', maxWidth: 620, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+
+          {/* Header */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, paddingBottom: 28, flexShrink: 0 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '6px 14px 6px 8px',
+              borderRadius: 999,
+              border: '0.5px solid var(--border)',
+              background: 'var(--surface)',
+              fontSize: 12, fontWeight: 500,
+            }}>
+              <div style={{
+                width: 22, height: 22, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+                display: 'grid', placeItems: 'center',
+              }}>
+                <Icon.Sparkle size={10} />
+              </div>
+              Ahmed AI
+              <span style={{ width: 1, height: 12, background: 'var(--border)', margin: '0 2px' }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00A86B', boxShadow: '0 0 8px #00A86B99' }} />
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 400 }}>live</span>
             </div>
-            <div className="col" style={{ gap: 1 }}>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>Ahmed AI</span>
-              <span className="row gap-2" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                <Icon.Dot size={4} color="#00A86B" />
-                SafeBusineSSSelling
+
+            {/* Topic progress pills */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+              {PROFILE_TOPICS.map(t => {
+                const done = coveredTopics.has(t.key);
+                return (
+                  <span key={t.key} style={{
+                    fontSize: 11, padding: '3px 10px', borderRadius: 999,
+                    background: done ? 'rgba(0,168,107,0.12)' : 'var(--surface)',
+                    border: `0.5px solid ${done ? 'rgba(0,168,107,0.35)' : 'var(--border)'}`,
+                    color: done ? '#00A86B' : 'var(--muted)',
+                    fontWeight: done ? 500 : 400,
+                    transition: 'all 0.2s ease',
+                    display: 'flex', alignItems: 'center', gap: 5,
+                  }}>
+                    {done && <span style={{ fontSize: 9 }}>✓</span>}
+                    {t.label}
+                  </span>
+                );
+              })}
+            </div>
+            {userAnswerCount > 0 && (
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {topicsCount} of {PROFILE_TOPICS.length} profile topics covered
               </span>
-            </div>
+            )}
           </div>
 
-          {/* Chat scroll area */}
-          <div ref={scrollRef} className="col gap-4" style={{ flex: 1, overflowY: 'auto', paddingBottom: 16 }}>
-            {messages.map((m, i) => (
-              <Message key={i} msg={m} />
-            ))}
-            {thinking && <TypingIndicator />}
+          {/* Chat scroll */}
+          <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+            <div ref={scrollRef} className="col gap-6 chat-scroll" style={{ flex: 1, minHeight: 0, paddingBottom: 48 }}>
+              {messages.map((m, i) => <Message key={i} msg={m} />)}
+              {thinking && <TypingIndicator />}
+            </div>
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, height: 80,
+              background: 'linear-gradient(to top, var(--bg) 30%, transparent)',
+              pointerEvents: 'none',
+            }} />
           </div>
         </div>
       </section>
 
-      {/* Bottom composer */}
-      <div style={{ padding: '8px 24px 32px', display: 'flex', justifyContent: 'center', background: 'linear-gradient(to top, var(--bg) 60%, transparent)' }}>
-        <div className="col gap-3" style={{ width: '100%', maxWidth: 680 }}>
-          {!navigating && (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={showMatchingBusinesses}
-              style={{ width: '100%', justifyContent: 'center' }}
-            >
-              Show matching businesses
-              <Icon.Arrow size={12} />
+      {/* Composer area */}
+      <div style={{ padding: '0 24px 24px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 620, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {!navigating && userAnswerCount >= 6 && (
+            <button onClick={showMatchingBusinesses} style={{
+              alignSelf: 'center',
+              padding: '10px 22px',
+              borderRadius: 999, border: '0.5px solid rgba(37,99,235,0.4)',
+              background: 'rgba(37,99,235,0.12)',
+              color: '#93c5fd', fontSize: 13, fontWeight: 500,
+              display: 'flex', alignItems: 'center', gap: 8,
+              cursor: 'pointer', letterSpacing: -0.1,
+              backdropFilter: 'blur(8px)',
+              transition: 'all 0.15s ease',
+            }}>
+              <Icon.Sparkle size={12} /> Show matching businesses <Icon.Arrow size={12} />
             </button>
           )}
 
           {!navigating ? (
-            <Composer
-              onSend={sendAnswer}
-              disabled={thinking}
-              answerCount={userAnswerCount}
-              shouldFocus={!thinking}
-            />
+            <Composer onSend={sendAnswer} disabled={thinking} answerCount={userAnswerCount} shouldFocus={!thinking} />
           ) : (
-            <div className="row hair" style={{ padding: 14, borderRadius: 12, alignItems: 'center', gap: 10, justifyContent: 'center', background: 'var(--surface)' }}>
-              <span className="spin" style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid var(--border-strong)', borderTopColor: 'var(--fg)', display: 'inline-block' }} />
-              <span style={{ fontSize: 13, color: 'var(--subtle)' }}>Loading your matches…</span>
+            <div style={{
+              padding: '16px 20px', borderRadius: 16,
+              border: '0.5px solid var(--border)', background: 'var(--surface)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            }}>
+              <span className="spin" style={{ width: 13, height: 13, borderRadius: '50%', border: '1.5px solid var(--border-strong)', borderTopColor: '#2563eb', display: 'inline-block' }} />
+              <span style={{ fontSize: 13, color: 'var(--subtle)' }}>Finding your matches…</span>
             </div>
           )}
 
-          {/* Bottom trust line */}
-          <div className="row gap-3" style={{ justifyContent: 'center', flexWrap: 'wrap', fontSize: 11, color: 'var(--muted)', paddingTop: 4 }}>
-            <span className="row gap-2"><Icon.Dot size={4} color="#00A86B" /> No password needed</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>Verified documents</span>
-            <span style={{ opacity: 0.4 }}>·</span>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, fontSize: 11, color: 'var(--muted)', flexWrap: 'wrap' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#00A86B', display: 'inline-block' }} />
+              No password needed
+            </span>
+            <span style={{ opacity: 0.25 }}>·</span>
+            <span>Verified businesses</span>
+            <span style={{ opacity: 0.25 }}>·</span>
             <span>Phased ownership</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>Based in Amsterdam</span>
+            <span style={{ opacity: 0.25 }}>·</span>
+            <span>Amsterdam</span>
           </div>
         </div>
       </div>
@@ -219,8 +319,16 @@ const Composer = memo(function Composer({
     }
   }
 
+  const active = !!input.trim();
   return (
-    <div className={`prompt-box ${input.trim() ? 'has-value' : ''}`} style={{ width: '100%', border: '0.5px solid var(--border-strong)', borderRadius: 14, background: 'var(--surface)' }}>
+    <div style={{
+      width: '100%',
+      border: `0.5px solid ${active ? 'rgba(37,99,235,0.5)' : 'var(--border)'}`,
+      borderRadius: 18,
+      background: 'var(--surface)',
+      transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+      boxShadow: active ? '0 0 0 3px rgba(37,99,235,0.08)' : 'none',
+    }}>
       <textarea
         ref={textareaRef}
         value={input}
@@ -228,31 +336,31 @@ const Composer = memo(function Composer({
         onKeyDown={handleKey}
         placeholder="Type your answer…"
         rows={1}
-        className="prompt-input"
         style={{
           border: 'none', outline: 'none', background: 'transparent',
-          padding: '14px 16px 0', fontSize: 15, lineHeight: 1.5, fontWeight: 300,
+          padding: '15px 16px 0', fontSize: 15, lineHeight: 1.6, fontWeight: 300,
           resize: 'none', minHeight: 24, width: '100%', fontFamily: 'inherit',
           color: 'var(--fg)',
         }}
       />
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '8px 8px 8px 16px' }}>
-        <span className="muted" style={{ fontSize: 11 }}>
-          {answerCount > 0 ? `Answered ${answerCount} · ` : ''}↵ to send · stop anytime above
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 8px 8px 16px' }}>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+          {answerCount === 0 ? 'Start typing · ↵ to send' : answerCount < 6 ? `${answerCount} answered · keep going` : `${answerCount} answered · ready to match`}
         </span>
         <button
           onClick={send}
-          disabled={!input.trim()}
+          disabled={!active}
           aria-label="Send"
           style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: input.trim() ? 'var(--blue)' : 'var(--surface-2)',
-            color: input.trim() ? '#FFFFFF' : 'var(--muted)',
+            width: 32, height: 32, borderRadius: 10, border: 'none',
+            background: active ? '#2563eb' : 'var(--surface-2)',
+            color: active ? '#fff' : 'var(--muted)',
             display: 'grid', placeItems: 'center',
-            cursor: input.trim() ? 'pointer' : 'not-allowed',
+            cursor: active ? 'pointer' : 'default',
+            transition: 'background 0.15s ease, color 0.15s ease',
           }}
         >
-          <Icon.Arrow size={13} />
+          <Icon.Arrow size={12} />
         </button>
       </div>
     </div>
@@ -262,16 +370,22 @@ const Composer = memo(function Composer({
 function Message({ msg }: { msg: ChatMessage }) {
   if (msg.from === 'bot') {
     return (
-      <div className="row gap-3" style={{ alignItems: 'flex-start' }}>
-        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--surface-2)', border: '0.5px solid var(--border)', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 2 }}>
-          <Icon.Sparkle size={11} />
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div style={{
+          width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 3,
+          background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+          display: 'grid', placeItems: 'center',
+        }}>
+          <Icon.Sparkle size={10} />
         </div>
-        <div className="col gap-2" style={{ maxWidth: '88%' }}>
-          <div style={{ fontSize: 15, lineHeight: 1.55, fontWeight: 300 }}>{msg.text}</div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 16, lineHeight: 1.7, fontWeight: 300, margin: 0, color: 'var(--fg)', letterSpacing: -0.1 }}>
+            {msg.text}
+          </p>
           {msg.searching && (
-            <div className="row gap-2 muted" style={{ fontSize: 12, marginTop: 4 }}>
-              <span className="spin" style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid var(--border-strong)', borderTopColor: 'var(--fg)', display: 'inline-block' }} />
-              Matching against verified listings…
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
+              <span className="spin" style={{ width: 10, height: 10, borderRadius: '50%', border: '1.5px solid var(--border-strong)', borderTopColor: '#2563eb', display: 'inline-block' }} />
+              Scanning verified listings…
             </div>
           )}
         </div>
@@ -279,17 +393,17 @@ function Message({ msg }: { msg: ChatMessage }) {
     );
   }
   return (
-    <div className="row" style={{ justifyContent: 'flex-end' }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
       <div style={{
-        maxWidth: '80%',
-        background: 'var(--surface-2)',
+        maxWidth: '68%',
+        background: 'var(--surface)',
         border: '0.5px solid var(--border)',
-        padding: '10px 14px',
-        borderRadius: 12,
-        borderBottomRightRadius: 4,
+        padding: '10px 15px',
+        borderRadius: 18,
+        borderBottomRightRadius: 5,
         fontSize: 14,
-        lineHeight: 1.5,
-        fontWeight: 400,
+        lineHeight: 1.55,
+        color: 'var(--fg)',
       }}>
         {msg.text}
       </div>
@@ -299,14 +413,18 @@ function Message({ msg }: { msg: ChatMessage }) {
 
 function TypingIndicator() {
   return (
-    <div className="row gap-3" style={{ alignItems: 'flex-start' }}>
-      <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--surface-2)', border: '0.5px solid var(--border)', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 2 }}>
-        <Icon.Sparkle size={11} />
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      <div style={{
+        width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 3,
+        background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+        display: 'grid', placeItems: 'center',
+      }}>
+        <Icon.Sparkle size={10} />
       </div>
-      <div className="row gap-1" style={{ padding: '14px 4px' }}>
-        <span className="pulse" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--subtle)', animationDelay: '0s' }} />
-        <span className="pulse" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--subtle)', animationDelay: '0.15s' }} />
-        <span className="pulse" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--subtle)', animationDelay: '0.3s' }} />
+      <div style={{ display: 'flex', gap: 5, paddingTop: 8 }}>
+        {[0, 0.18, 0.36].map((delay, i) => (
+          <span key={i} className="pulse" style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--muted)', animationDelay: `${delay}s`, display: 'inline-block' }} />
+        ))}
       </div>
     </div>
   );
@@ -315,7 +433,7 @@ export function HowItWorksPage() {
   const [side, setSide] = useState<'buyer' | 'seller'>('buyer');
 
   const buyerSteps = [
-    { n: '01', t: 'Tell us what you\'re looking for', d: 'Run a 6-question AI match. Indicate budget, sector experience, location preference, and the level of operational involvement you want.', dur: '5 min' },
+    { n: '01', t: 'Tell us what you\'re looking for', d: 'Chat with Ahmed AI. He covers 9 profile topics — sector, budget, revenue floor, location, your role post-close, experience, timeline, handover needs, and deal-breakers. The more you share, the sharper the matches.', dur: '~5 min' },
     { n: '02', t: 'Get a ranked shortlist', d: 'Our model returns 5–8 fit-scored matches drawn only from verified listings. Each match comes with a "why this fits" rationale.', dur: 'Instant' },
     { n: '03', t: 'Sign NDA, unlock data room', d: 'Digital NDA + €5K refundable escrow deposit unlocks financials, contracts, ops manuals, and direct seller messaging.', dur: 'Same-day' },
     { n: '04', t: 'Run diligence with a coordinator', d: 'A neutral SBS deal coordinator runs the timeline. Independent advisors (legal, financial) are vetted and bookable in-app.', dur: '4–8 weeks' },
@@ -339,11 +457,11 @@ export function HowItWorksPage() {
           <SectionEyebrow>How it works</SectionEyebrow>
           <h1 style={{ fontSize: 64, maxWidth: 760 }}>A protected path, from first inquiry to full ownership.</h1>
           <p style={{ fontSize: 17, color: 'var(--subtle)', maxWidth: 620, fontWeight: 300 }}>
-            Choose your side. Each path is purpose-built for the role you're playing in the deal.
+            One account, two directions. See how it works whether you're acquiring or listing.
           </p>
 
           <div className="row gap-2 hair" style={{ padding: 4, borderRadius: 999, width: 'fit-content', marginTop: 24 }}>
-            {[{ id: 'buyer', l: 'For buyers' }, { id: 'seller', l: 'For sellers' }].map(t => (
+            {[{ id: 'buyer', l: 'Acquiring a business' }, { id: 'seller', l: 'Listing a business' }].map(t => (
               <button key={t.id} onClick={() => setSide(t.id as 'buyer' | 'seller')}
                 style={{
                   padding: '8px 18px', borderRadius: 999, fontSize: 13, fontWeight: 500,
@@ -381,13 +499,19 @@ export function HowItWorksPage() {
           </div>
           <div className="row mobile-wrap" style={{ gap: 16, alignItems: 'stretch' }}>
             {[
-              { p: 'Buyer', tag: '1.5%', sub: 'of transaction value', f: ['AI match access', 'NDA + data room', 'Deal coordinator', 'Escrow protection', 'Phased ownership contract'] },
-              { p: 'Seller', tag: '4%', sub: 'on close only', f: ['Verified listing', 'AI-generated copy', 'Buyer screening', 'Deal coordinator', 'Handover playbook'], featured: true },
-              { p: 'Premium seller', tag: '€2,400', sub: 'one-time, on top of 4%', f: ['Featured placement', 'Premium badge', 'Priority verification (48h)', 'Dedicated advisor', 'Listing score boost'] },
+              { p: 'When buying', tag: '3%', sub: 'of transaction value, paid at close', f: ['AI match access', 'NDA + data room', 'Deal coordinator', 'Escrow protection', 'Phased ownership contract'] },
+              { p: 'When selling', tag: '3%', sub: 'of transaction value, paid at close', f: ['Verified listing', 'AI-generated copy', 'Buyer screening', 'Deal coordinator', 'Handover playbook'], featured: true },
             ].map(t => (
-              <div key={t.p} className="card col" style={{ flex: 1, padding: 32, background: t.featured ? 'var(--fg)' : 'var(--surface)', color: t.featured ? 'var(--bg)' : 'var(--fg)' }}>
+              <div key={t.p} className="card col" style={{
+                flex: 1, padding: 32,
+                background: t.featured ? 'var(--surface)' : 'var(--surface)',
+                border: t.featured ? '1px solid rgba(37,99,235,0.5)' : '0.5px solid var(--border)',
+                boxShadow: t.featured ? '0 0 0 1px rgba(37,99,235,0.15), 0 8px 32px rgba(37,99,235,0.08)' : 'none',
+              }}>
                 <div className="col gap-2" style={{ marginBottom: 32 }}>
-                  <span style={{ fontSize: 12, opacity: 0.6 }}>{t.p}</span>
+                  <div className="row gap-2" style={{ alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, opacity: 0.6 }}>{t.p}</span>
+                  </div>
                   <div className="row" style={{ alignItems: 'baseline', gap: 8 }}>
                     <span style={{ fontSize: 40, fontWeight: 500, letterSpacing: -1.5 }}>{t.tag}</span>
                     <span style={{ fontSize: 13, opacity: 0.6 }}>{t.sub}</span>
@@ -396,7 +520,7 @@ export function HowItWorksPage() {
                 <div className="col gap-3" style={{ flex: 1 }}>
                   {t.f.map(x => (
                     <div key={x} className="row gap-2" style={{ fontSize: 13 }}>
-                      <Icon.Check size={12} color={t.featured ? '#FFFFFF' : '#00A86B'} />
+                      <Icon.Check size={12} color="#00A86B" />
                       <span style={{ opacity: 0.9 }}>{x}</span>
                     </div>
                   ))}
@@ -404,6 +528,86 @@ export function HowItWorksPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function PricingPage() {
+  return (
+    <div className="page-enter">
+      <section style={{ padding: '96px 0 64px' }}>
+        <div className="container col gap-4" style={{ maxWidth: 720 }}>
+          <SectionEyebrow>Pricing</SectionEyebrow>
+          <h1 style={{ fontSize: 56, letterSpacing: -1.8 }}>Simple fees. No monthly cost.</h1>
+          <p style={{ fontSize: 17, color: 'var(--subtle)', fontWeight: 300, lineHeight: 1.6 }}>
+            You pay nothing upfront. A single success fee is charged at close — only when a deal is completed.
+          </p>
+        </div>
+      </section>
+
+      <section className="hair-t section">
+        <div className="container">
+          <div className="row mobile-wrap" style={{ gap: 16, alignItems: 'stretch', maxWidth: 880, margin: '0 auto' }}>
+            {[
+              {
+                p: 'When buying',
+                tag: '3%',
+                sub: 'of transaction value, paid at close',
+                f: ['AI buyer matching', 'NDA + data room access', 'Deal coordinator', 'Escrow protection', 'Phased ownership contract'],
+              },
+              {
+                p: 'When selling',
+                tag: '3%',
+                sub: 'of transaction value, paid at close',
+                f: ['Verified listing', 'AI-generated listing copy', 'Buyer screening', 'Deal coordinator', 'Handover playbook'],
+                featured: true,
+              },
+            ].map(t => (
+              <div key={t.p} className="card col" style={{
+                flex: 1, padding: 36,
+                border: t.featured ? '1px solid rgba(37,99,235,0.5)' : '0.5px solid var(--border)',
+                boxShadow: t.featured ? '0 0 0 1px rgba(37,99,235,0.15), 0 8px 32px rgba(37,99,235,0.08)' : 'none',
+              }}>
+                <div className="col gap-2" style={{ marginBottom: 32 }}>
+                  <span style={{ fontSize: 12, opacity: 0.6 }}>{t.p}</span>
+                  <div className="row" style={{ alignItems: 'baseline', gap: 8 }}>
+                    <span style={{ fontSize: 48, fontWeight: 500, letterSpacing: -2 }}>{t.tag}</span>
+                    <span style={{ fontSize: 13, opacity: 0.6 }}>{t.sub}</span>
+                  </div>
+                </div>
+                <div className="col gap-3" style={{ flex: 1 }}>
+                  {t.f.map(x => (
+                    <div key={x} className="row gap-2" style={{ fontSize: 14 }}>
+                      <Icon.Check size={12} color="#00A86B" />
+                      <span style={{ opacity: 0.9 }}>{x}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container col gap-6" style={{ maxWidth: 720 }}>
+          <h2 style={{ fontSize: 32, letterSpacing: -0.8 }}>How the fee works</h2>
+          {[
+            { n: '01', t: 'Deal is agreed', d: 'Buyer and seller agree on price and terms. The phased ownership contract is signed.' },
+            { n: '02', t: 'Funds go into escrow', d: 'The buyer transfers the amount to a licensed escrow account. No money moves until conditions are met.' },
+            { n: '03', t: 'Conditions are met', d: 'Each ownership phase completes. When the final phase closes, funds are released to the seller.' },
+            { n: '04', t: 'Fee is charged at close', d: 'SafeBusinessSelling deducts 3% from the buyer\'s payment and 3% from the seller\'s proceeds. Nothing before.' },
+          ].map(s => (
+            <div key={s.n} className="row gap-5 hair" style={{ padding: 24, borderRadius: 12, alignItems: 'flex-start' }}>
+              <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 1, color: 'var(--muted)', minWidth: 24, paddingTop: 2 }}>{s.n}</span>
+              <div className="col gap-1">
+                <span style={{ fontSize: 15, fontWeight: 500 }}>{s.t}</span>
+                <span style={{ fontSize: 14, color: 'var(--subtle)', fontWeight: 300, lineHeight: 1.6 }}>{s.d}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
     </div>

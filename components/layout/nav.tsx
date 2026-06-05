@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button, Logo } from '@/components/ui';
 import { NAV_LINKS } from '@/lib/routes';
+import { createClient } from '@/lib/supabase-browser';
 
 function isActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
@@ -33,6 +34,14 @@ function CloseIcon() {
 export function Nav({ transparent = false }: { transparent?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => setLoggedIn(!!session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setLoggedIn(!!session));
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <nav
@@ -67,14 +76,20 @@ export function Nav({ transparent = false }: { transparent?: boolean }) {
 
         {/* Desktop auth buttons */}
         <div className="nav-desktop gap-4" style={{ alignItems: 'center' }}>
-          <Link
-            href="/sign-in"
-            className={`nav-link ${isActive(pathname, '/sign-in') ? 'active' : ''}`}
-            style={{ cursor: 'pointer' }}
-          >
-            Sign in
-          </Link>
-          <Button href="/sign-up" variant="primary" size="sm">Sign up</Button>
+          {loggedIn ? (
+            <Button href="/dashboard" variant="primary" size="sm">Profile</Button>
+          ) : (
+            <>
+              <Link
+                href="/sign-in"
+                className={`nav-link ${isActive(pathname, '/sign-in') ? 'active' : ''}`}
+                style={{ cursor: 'pointer' }}
+              >
+                Sign in
+              </Link>
+              <Button href="/sign-up" variant="primary" size="sm">Sign up</Button>
+            </>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -103,17 +118,25 @@ export function Nav({ transparent = false }: { transparent?: boolean }) {
                 {l.label}
               </Link>
             ))}
-            <Link
-              href="/sign-in"
-              onClick={() => setOpen(false)}
-              className={`nav-link ${isActive(pathname, '/sign-in') ? 'active' : ''}`}
-              style={{ padding: '10px 0', fontSize: 15, borderBottom: '0.5px solid var(--border)' }}
-            >
-              Sign in
-            </Link>
-            <div style={{ paddingTop: 12 }}>
-              <Button href="/sign-up" onClick={() => setOpen(false)} variant="primary" size="sm" style={{ width: '100%', justifyContent: 'center' }}>Sign up</Button>
-            </div>
+            {loggedIn ? (
+              <div style={{ paddingTop: 12 }}>
+                <Button href="/dashboard" onClick={() => setOpen(false)} variant="primary" size="sm" style={{ width: '100%', justifyContent: 'center' }}>Profile</Button>
+              </div>
+            ) : (
+              <>
+                <Link
+                  href="/sign-in"
+                  onClick={() => setOpen(false)}
+                  className={`nav-link ${isActive(pathname, '/sign-in') ? 'active' : ''}`}
+                  style={{ padding: '10px 0', fontSize: 15, borderBottom: '0.5px solid var(--border)' }}
+                >
+                  Sign in
+                </Link>
+                <div style={{ paddingTop: 12 }}>
+                  <Button href="/sign-up" onClick={() => setOpen(false)} variant="primary" size="sm" style={{ width: '100%', justifyContent: 'center' }}>Sign up</Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -11,7 +11,7 @@ const cols = [
       { l: 'Browse listings', p: 'marketplace' },
       { l: 'AI buyer matching', p: 'ai-match' },
       { l: 'Sell a business', p: 'seller-onboarding' },
-      { l: 'Pricing', p: 'how' },
+      { l: 'Pricing', p: 'pricing' },
     ],
   },
   {

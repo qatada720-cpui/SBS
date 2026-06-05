@@ -15,25 +15,33 @@ export function AccountDashboardPage() {
   const [listingCount, setListingCount] = useState(0);
   const [conversationCount, setConversationCount] = useState(0);
   const [signingOut, setSigningOut] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const supabase = createClient();
 
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/sign-in'); return; }
-      setUser(user);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { router.push('/sign-in'); return; }
+        setUser(session.user);
 
-      const [{ data: prof }, { count: listings }, { count: convos }] = await Promise.all([
-        supabase.from('profiles').select('full_name, role').eq('id', user.id).single(),
-        supabase.from('listings').select('*', { count: 'exact', head: true }).eq('seller_id', user.id),
-        supabase.from('conversations').select('*', { count: 'exact', head: true })
-          .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`),
-      ]);
+        const [{ data: prof }, { count: listings }, { count: convos }] = await Promise.all([
+          supabase.from('profiles').select('full_name, role').eq('id', session.user.id).single(),
+          supabase.from('listings').select('*', { count: 'exact', head: true }).eq('seller_id', session.user.id),
+          supabase.from('conversations').select('*', { count: 'exact', head: true })
+            .or(`buyer_id.eq.${session.user.id},seller_id.eq.${session.user.id}`),
+        ]);
 
-      if (prof) setProfile(prof);
-      setListingCount(listings ?? 0);
-      setConversationCount(convos ?? 0);
+        if (prof) setProfile(prof);
+        setListingCount(listings ?? 0);
+        setConversationCount(convos ?? 0);
+      } catch {
+        setError('Failed to load dashboard. Please refresh the page.');
+      } finally {
+        setLoading(false);
+      }
     }
 
     load();
@@ -51,6 +59,45 @@ export function AccountDashboardPage() {
     ?? user?.user_metadata?.full_name
     ?? user?.email?.split('@')[0]
     ?? 'there';
+
+  if (loading) {
+    return (
+      <div className="page-enter">
+        <section style={{ padding: '32px 0 0' }}>
+          <div className="container col gap-6">
+            <div style={{ height: 80, background: 'var(--surface-2)', borderRadius: 12, animation: 'pulse 1.5s ease-in-out infinite' }} />
+          </div>
+        </section>
+        <section style={{ padding: '40px 0 96px' }}>
+          <div className="container col gap-6">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+              <div style={{ height: 160, background: 'var(--surface-2)', borderRadius: 12, animation: 'pulse 1.5s ease-in-out infinite' }} />
+              <div style={{ height: 160, background: 'var(--surface-2)', borderRadius: 12, animation: 'pulse 1.5s ease-in-out infinite' }} />
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page-enter">
+        <section style={{ padding: '96px 0 80px' }}>
+          <div className="container col gap-6" style={{ maxWidth: 440, margin: '0 auto', alignItems: 'center', textAlign: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: '#FF3B3011', display: 'grid', placeItems: 'center' }}>
+              <Icon.Shield size={24} color="#FF3B30" />
+            </div>
+            <div className="col gap-2">
+              <h2 style={{ fontSize: 24, fontWeight: 700 }}>Something went wrong</h2>
+              <p className="muted" style={{ fontSize: 15, lineHeight: 1.6 }}>{error}</p>
+            </div>
+            <Button variant="primary" onClick={() => window.location.reload()}>Refresh page</Button>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="page-enter">
