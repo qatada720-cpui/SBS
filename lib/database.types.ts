@@ -22,6 +22,8 @@ export interface Database {
           name: string;
           sector: string;
           location: string;
+          founded: number | null;
+          employees: number | null;
           revenue: number;
           ebitda: number;
           asking_price: number;
@@ -29,13 +31,17 @@ export interface Database {
           score: number;
           verified: boolean;
           premium: boolean;
-          status: 'draft' | 'pending_review' | 'live' | 'under_offer' | 'sold';
+          status: 'draft' | 'pending_review' | 'live' | 'under_offer' | 'sold' | 'rejected';
+          rejection_reason: string | null;
+          phases: Json | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
           photos: string[];
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['listings']['Row'], 'id' | 'created_at' | 'updated_at' | 'score' | 'verified'>;
-        Update: Partial<Database['public']['Tables']['listings']['Insert']>;
+        Insert: Omit<Database['public']['Tables']['listings']['Row'], 'id' | 'created_at' | 'updated_at' | 'verified' | 'premium'>;
+        Update: Partial<Database['public']['Tables']['listings']['Row']>;
       };
       conversations: {
         Row: {
