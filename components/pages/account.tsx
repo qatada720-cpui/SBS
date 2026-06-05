@@ -310,7 +310,8 @@ export function SellerOnboardingPage() {
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setSubmitting(false); return; }
-    await supabase.from('listings').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('listings') as any).insert({
       seller_id: session.user.id,
       name: form.name,
       sector: form.sector,
