@@ -91,7 +91,7 @@ const [sort, setSort] = useState(searchParams.sort ?? 'score');
     else if (sort === 'newest') query = query.order('created_at', { ascending: false });
 
     const { data, count } = await query;
-    setListings((data ?? []).map(r => toCard(r as DbListing)));
+    setListings((data ?? []).map((r: DbListing) => toCard(r)));
     setTotal(count ?? 0);
     setLoading(false);
   }, [sector, priceRange, verifiedOnly, sort]);
