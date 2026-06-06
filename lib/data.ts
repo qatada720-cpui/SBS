@@ -8,7 +8,6 @@ export interface Listing {
   asking: string;
   score: number;
   verified: boolean;
-  premium: boolean;
   photos: number;
   employees?: number;
   founded?: number;
