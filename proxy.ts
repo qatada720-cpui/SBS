@@ -2,30 +2,41 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // If env vars are missing, pass through without auth checks
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll(); },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() { return request.cookies.getAll(); },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        supabaseResponse = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options)
+        );
       },
-    }
-  );
+    },
+  });
 
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    return supabaseResponse;
+  }
 
   // Redirect unauthenticated users away from protected pages
   const protectedPaths = ['/dashboard', '/seller', '/buyer', '/messages', '/admin', '/ai-match'];
-  const { pathname } = request.nextUrl;
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
   if (isProtected && !user) {
     const signIn = new URL('/sign-in', request.url);
@@ -35,7 +46,7 @@ export async function proxy(request: NextRequest) {
 
   // Redirect logged-in users away from auth pages
   const authPaths = ['/sign-in', '/sign-up'];
-  const isAuth = authPaths.some((p) => request.nextUrl.pathname.startsWith(p));
+  const isAuth = authPaths.some((p) => pathname.startsWith(p));
   if (isAuth && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
