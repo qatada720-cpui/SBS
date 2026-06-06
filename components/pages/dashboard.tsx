@@ -88,7 +88,7 @@ export function AccountDashboardPage() {
         <section style={{ padding: '96px 0 80px' }}>
           <div className="container col gap-6" style={{ maxWidth: 440, margin: '0 auto', alignItems: 'center', textAlign: 'center' }}>
             <div style={{ width: 56, height: 56, borderRadius: 16, background: '#FF3B3011', display: 'grid', placeItems: 'center' }}>
-              <Icon.Shield size={24} color="#FF3B30" />
+              <span style={{ color: '#FF3B30' }}><Icon.Shield size={24} /></span>
             </div>
             <div className="col gap-2">
               <h2 style={{ fontSize: 24, fontWeight: 700 }}>Something went wrong</h2>
