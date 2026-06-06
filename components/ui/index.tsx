@@ -298,7 +298,6 @@ export function ListingCard({ listing, href }: { listing: Listing; href?: string
       <div className="img-ph" style={{ height: 160, borderRadius: 0, borderBottom: '0.5px solid var(--border)' }}>
         <div className="row gap-2" style={{ position: 'absolute', top: 12, left: 12, zIndex: 2 }}>
           {listing.verified && <VerifiedBadge />}
-          {listing.premium && <PremiumBadge />}
         </div>
         <div
           style={{
