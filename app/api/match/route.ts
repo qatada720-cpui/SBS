@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const supabase = createClient(
+const getSupabase = () => createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
@@ -65,7 +65,7 @@ Number conversion rules:
     }
 
     // Step 2: Fetch all live listings from Supabase
-    const { data: allListings } = await supabase
+    const { data: allListings } = await getSupabase()
       .from('listings')
       .select('*')
       .eq('status', 'live');
