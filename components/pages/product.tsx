@@ -240,8 +240,8 @@ export function ListingPage({ listingId }: { listingId: string }) {
         asking: data.asking_price ? `€${(Number(data.asking_price) / 1_000_000).toFixed(1)}M` : '',
         score: data.score ?? 0,
         verified: !!data.verified,
-        founded: data.founded ? String(data.founded) : '',
-        employees: data.employees ? String(data.employees) : '',
+        founded: data.founded ? Number(data.founded) : undefined,
+        employees: data.employees ? Number(data.employees) : undefined,
         photos: data.photos ?? 4,
         description: data.description ?? '',
       } as Listing);
