@@ -44,7 +44,7 @@ function dbToCard(r: DbListing): Listing {
     revenue: formatEur(r.revenue),
     ebitda: r.ebitda ? formatEur(r.ebitda) : undefined,
     asking: formatEur(r.asking_price),
-    score: r.score, verified: r.verified, premium: r.premium,
+    score: r.score, verified: r.verified,
     photos: r.photos?.length ?? 0,
     description: r.description ?? '',
   };
