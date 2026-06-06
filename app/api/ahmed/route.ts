@@ -1,7 +1,7 @@
 import Groq from 'groq-sdk';
 import { NextRequest } from 'next/server';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const SYSTEM_PROMPT = `You are Ahmed, a friendly advisor at SafeBusinessSelling — a marketplace where people buy and sell verified businesses. Your job is to understand what someone is looking for and find the best matches for them.
 
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
 
-    const stream = await groq.chat.completions.create({
+    const stream = await getGroq().chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

@@ -2,7 +2,7 @@ import Groq from 'groq-sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const { messages } = await req.json();
 
     // Step 1: Extract structured buyer profile from conversation
-    const profileCompletion = await groq.chat.completions.create({
+    const profileCompletion = await getGroq().chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
         {
@@ -119,7 +119,7 @@ Number conversion rules:
     }
 
     // Step 4: AI scoring on the pre-filtered set
-    const scoringCompletion = await groq.chat.completions.create({
+    const scoringCompletion = await getGroq().chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
         {
