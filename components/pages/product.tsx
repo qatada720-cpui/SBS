@@ -226,6 +226,7 @@ export function ListingPage({ listingId }: { listingId: string }) {
   const [expressed, setExpressed] = useState(false);
   const [ndaStatus, setNdaStatus] = useState<'none' | 'pending' | 'signed'>('none');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [interestMsg, setInterestMsg] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -308,7 +309,12 @@ export function ListingPage({ listingId }: { listingId: string }) {
   async function handleExpressInterest() {
     if (!userId) { router.push(`/sign-in?next=/listing/${listingId}`); return; }
     if (expressed) { router.push('/messages'); return; }
-    if (!sellerId || sellerId === userId) return;
+    if (sellerId === userId) {
+      setInterestMsg("You can't express interest in your own listing.");
+      setTimeout(() => setInterestMsg(''), 3000);
+      return;
+    }
+    if (!sellerId) return;
     setActionLoading('interest');
     const supabase = createClient();
     await supabase.from('conversations').insert({
@@ -626,6 +632,9 @@ export function ListingPage({ listingId }: { listingId: string }) {
                 <Button variant="primary" size="md" iconRight={<Icon.Arrow size={12} />} onClick={handleExpressInterest} disabled={actionLoading === 'interest'}>
                   {expressed ? 'View conversation' : 'Express interest'}
                 </Button>
+                {interestMsg && (
+                  <div style={{ fontSize: 12, color: '#FF3B30', padding: '4px 0' }}>{interestMsg}</div>
+                )}
                 <Button variant="secondary" size="md" icon={<Icon.Message size={12} />} onClick={() => router.push('/messages')}>
                   Go to messages
                 </Button>
