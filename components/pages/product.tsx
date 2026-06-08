@@ -400,12 +400,17 @@ export function ListingPage({ listingId }: { listingId: string }) {
             </div>
           </div>
           <div className="row gap-2">
-            <Button variant="secondary" size="sm" icon={<Icon.Bookmark size={12} />} onClick={handleSave} disabled={actionLoading === 'save'}>
-              {saved ? 'Saved' : 'Save'}
-            </Button>
-            <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />} onClick={handleExpressInterest} disabled={actionLoading === 'interest'}>
-              {expressed ? 'View conversation' : 'Express interest'}
-            </Button>
+            {sellerId !== userId && (
+              <Button variant="secondary" size="sm" icon={<Icon.Bookmark size={12} />} onClick={handleSave} disabled={actionLoading === 'save'}>
+                {saved ? 'Saved' : 'Save'}
+              </Button>
+            )}
+            {sellerId === userId
+              ? <Button variant="secondary" size="sm" onClick={() => router.push('/seller/dashboard')}>Manage listing</Button>
+              : <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />} onClick={handleExpressInterest} disabled={actionLoading === 'interest'}>
+                  {expressed ? 'View conversation' : 'Express interest'}
+                </Button>
+            }
           </div>
         </div>
       </section>
@@ -629,16 +634,26 @@ export function ListingPage({ listingId }: { listingId: string }) {
                 </div>
               </div>
               <div className="col gap-2">
-                <Button variant="primary" size="md" iconRight={<Icon.Arrow size={12} />} onClick={handleExpressInterest} disabled={actionLoading === 'interest'}>
-                  {expressed ? 'View conversation' : 'Express interest'}
-                </Button>
-                {interestMsg && (
-                  <div style={{ fontSize: 12, color: '#FF3B30', padding: '4px 0' }}>{interestMsg}</div>
+                {sellerId === userId ? (
+                  <>
+                    <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 12px', borderRadius: 8, background: 'var(--surface)', textAlign: 'center' }}>
+                      This is your listing
+                    </div>
+                    <Button variant="secondary" size="md" onClick={() => router.push('/seller/dashboard')}>
+                      Manage in dashboard
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="primary" size="md" iconRight={<Icon.Arrow size={12} />} onClick={handleExpressInterest} disabled={actionLoading === 'interest'}>
+                      {expressed ? 'View conversation' : 'Express interest'}
+                    </Button>
+                    <Button variant="secondary" size="md" icon={<Icon.Message size={12} />} onClick={() => router.push('/messages')}>
+                      Go to messages
+                    </Button>
+                  </>
                 )}
-                <Button variant="secondary" size="md" icon={<Icon.Message size={12} />} onClick={() => router.push('/messages')}>
-                  Go to messages
-                </Button>
-                {ndaStatus === 'none' && (
+                {ndaStatus === 'none' && sellerId !== userId && (
                   <Button variant="ghost" size="sm" icon={<Icon.Doc size={12} />} onClick={handleRequestDataRoom} disabled={actionLoading === 'nda'}>
                     Request data room
                   </Button>
