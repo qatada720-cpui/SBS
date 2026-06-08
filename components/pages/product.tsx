@@ -309,7 +309,7 @@ export function ListingPage({ listingId }: { listingId: string }) {
   async function handleExpressInterest() {
     if (!userId) { router.push(`/sign-in?next=/listing/${listingId}`); return; }
     if (expressed) { router.push('/messages'); return; }
-    if (sellerId === userId) {
+    if (userId !== null && sellerId === userId) {
       setInterestMsg("You can't express interest in your own listing.");
       setTimeout(() => setInterestMsg(''), 3000);
       return;
@@ -405,7 +405,7 @@ export function ListingPage({ listingId }: { listingId: string }) {
                 {saved ? 'Saved' : 'Save'}
               </Button>
             )}
-            {sellerId === userId
+            {userId !== null && sellerId === userId
               ? <Button variant="secondary" size="sm" onClick={() => router.push('/seller/dashboard')}>Manage listing</Button>
               : <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />} onClick={handleExpressInterest} disabled={actionLoading === 'interest'}>
                   {expressed ? 'View conversation' : 'Express interest'}
@@ -634,7 +634,7 @@ export function ListingPage({ listingId }: { listingId: string }) {
                 </div>
               </div>
               <div className="col gap-2">
-                {sellerId === userId ? (
+                {userId !== null && sellerId === userId ? (
                   <>
                     <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 12px', borderRadius: 8, background: 'var(--surface)', textAlign: 'center' }}>
                       This is your listing
