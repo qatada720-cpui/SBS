@@ -44,6 +44,8 @@ export function MessagingPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduleMsg, setScheduleMsg] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -170,6 +172,28 @@ export function MessagingPage() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   }
 
+  async function handleSignNda() {
+    if (!activeId || !userId || !active) return;
+    const supabase = createClient();
+    const field = active.buyer_id === userId ? 'nda_signed_buyer' : 'nda_signed_seller';
+    await supabase.from('conversations').update({ [field]: true }).eq('id', activeId);
+    setConvos(prev => prev.map(c => c.id === activeId ? { ...c, nda_signed: true } : c));
+  }
+
+  async function sendScheduleMessage() {
+    if (!scheduleMsg.trim() || !activeId || !userId) return;
+    const body = `📅 Call request: ${scheduleMsg.trim()}`;
+    const supabase = createClient();
+    const { data: newMsg } = await supabase
+      .from('messages')
+      .insert({ conversation_id: activeId, sender_id: userId, body })
+      .select().single();
+    if (newMsg) setMessages(prev => [...prev, newMsg]);
+    setConvos(prev => prev.map(c => c.id === activeId ? { ...c, last_message: body, last_ts: 'Just now' } : c));
+    setScheduleMsg('');
+    setShowSchedule(false);
+  }
+
   if (loading) return (
     <div className="page-enter" style={{ padding: '80px 0', textAlign: 'center' }}>
       <div className="container"><p className="muted">Loading conversations…</p></div>
@@ -284,11 +308,27 @@ export function MessagingPage() {
                 <div className="row gap-2">
                   {active.nda_signed
                     ? <span className="badge badge-verified" style={{ fontSize: 11 }}><Icon.Check size={10} /> NDA signed</span>
-                    : <Button size="sm">Sign NDA</Button>
+                    : <Button size="sm" onClick={handleSignNda}>Sign NDA</Button>
                   }
-                  <Button size="sm" variant="secondary">Schedule call</Button>
+                  <Button size="sm" variant="secondary" onClick={() => setShowSchedule(v => !v)}>Schedule call</Button>
                 </div>
               </div>
+
+              {/* Schedule call panel */}
+              {showSchedule && (
+                <div style={{ padding: '12px 20px', borderBottom: '0.5px solid var(--hair)', background: 'var(--surface)', display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    value={scheduleMsg}
+                    onChange={e => setScheduleMsg(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && sendScheduleMessage()}
+                    placeholder="Propose a time, e.g. Tuesday 14:00 CET"
+                    style={{ flex: 1, fontSize: 13, background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--fg)', outline: 'none' }}
+                    autoFocus
+                  />
+                  <Button size="sm" variant="primary" onClick={sendScheduleMessage} disabled={!scheduleMsg.trim()}>Send</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowSchedule(false)}>Cancel</Button>
+                </div>
+              )}
 
               {/* Messages */}
               <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
