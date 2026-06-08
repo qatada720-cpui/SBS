@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Icon, VerifiedBadge, ScoreBar, PhaseTracker, ListingCard, SectionEyebrow } from '@/components/ui';
-import { SECTORS, PHASES, REVIEWS } from '@/lib/data';
+import { SECTORS, PHASES } from '@/lib/data';
 import type { Listing } from '@/lib/data';
 import { createClient as _createClient } from '@/lib/supabase-browser';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -586,36 +586,10 @@ export function ListingPage({ listingId }: { listingId: string }) {
             {tab === 'reviews' && (
               <div className="col gap-6">
                 <div className="col gap-3">
-                  <h3>Reviews from past buyers & sellers</h3>
-                  <div className="row gap-3" style={{ alignItems: 'center' }}>
-                    <div className="row gap-1">
-                      {[1, 2, 3, 4, 5].map(s => <Icon.Star key={s} size={14} color="#C8922A" filled />)}
-                    </div>
-                    <span style={{ fontSize: 14, fontWeight: 500 }}>4.9</span>
-                    <span className="muted" style={{ fontSize: 13 }}>no reviews yet</span>
-                  </div>
+                  <h3>Buyer reviews</h3>
                 </div>
-                <div className="col gap-4">
-                  {REVIEWS.map((r, i) => (
-                    <div key={i} className="card col gap-3" style={{ padding: 24 }}>
-                      <div className="row" style={{ justifyContent: 'space-between' }}>
-                        <div className="row gap-3">
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--surface-2)', border: '0.5px solid var(--border)' }} />
-                          <div className="col" style={{ gap: 2 }}>
-                            <span style={{ fontSize: 14, fontWeight: 500 }}>{r.name}</span>
-                            <span className="muted" style={{ fontSize: 12 }}>{r.role}</span>
-                          </div>
-                        </div>
-                        <div className="col" style={{ alignItems: 'flex-end', gap: 4 }}>
-                          <div className="row gap-1">
-                            {[1, 2, 3, 4, 5].map(s => <Icon.Star key={s} size={11} color="#C8922A" filled={s <= r.rating} />)}
-                          </div>
-                          <span className="muted" style={{ fontSize: 11 }}>{r.date}</span>
-                        </div>
-                      </div>
-                      <p style={{ fontSize: 14, fontWeight: 300, lineHeight: 1.55 }}>{r.text}</p>
-                    </div>
-                  ))}
+                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--muted)', fontSize: 14 }}>
+                  No reviews yet for this listing.
                 </div>
               </div>
             )}
