@@ -240,7 +240,8 @@ export function ListingPage({ listingId }: { listingId: string }) {
         .eq('id', listingId)
         .single();
       if (!data) { setListing(null); return; }
-      setSellerId(data.seller_id);
+      console.log('DEBUG seller_id:', data.seller_id);
+      setSellerId(data.seller_id ?? null);
       setListing({
         id: String(data.id),
         name: data.name ?? '',
@@ -260,6 +261,7 @@ export function ListingPage({ listingId }: { listingId: string }) {
       // Check user state
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      console.log('DEBUG user_id:', user.id);
       setUserId(user.id);
 
       // Check if saved
