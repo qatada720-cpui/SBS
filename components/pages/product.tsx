@@ -626,8 +626,8 @@ export function ListingPage({ listingId }: { listingId: string }) {
                 <Button variant="primary" size="md" iconRight={<Icon.Arrow size={12} />} onClick={handleExpressInterest} disabled={actionLoading === 'interest'}>
                   {expressed ? 'View conversation' : 'Express interest'}
                 </Button>
-                <Button variant="secondary" size="md" icon={<Icon.Message size={12} />} onClick={() => expressed ? router.push('/messages') : handleExpressInterest()}>
-                  {expressed ? 'Go to messages' : 'Message seller'}
+                <Button variant="secondary" size="md" icon={<Icon.Message size={12} />} onClick={() => router.push('/messages')}>
+                  Go to messages
                 </Button>
                 {ndaStatus === 'none' && (
                   <Button variant="ghost" size="sm" icon={<Icon.Doc size={12} />} onClick={handleRequestDataRoom} disabled={actionLoading === 'nda'}>
