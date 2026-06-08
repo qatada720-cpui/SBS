@@ -218,18 +218,28 @@ const [sort, setSort] = useState(searchParams.sort ?? 'score');
 }
 
 export function ListingPage({ listingId }: { listingId: string }) {
+  const router = useRouter();
   const [listing, setListing] = useState<Listing | null | undefined>(undefined);
+  const [sellerId, setSellerId] = useState<string | null>(null);
   const [tab, setTab] = useState('overview');
+  const [saved, setSaved] = useState(false);
+  const [expressed, setExpressed] = useState(false);
+  const [ndaStatus, setNdaStatus] = useState<'none' | 'pending' | 'signed'>('none');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       const supabase = createClient();
+
+      // Load listing
       const { data } = await supabase
         .from('listings')
         .select('*')
         .eq('id', listingId)
         .single();
       if (!data) { setListing(null); return; }
+      setSellerId(data.seller_id);
       setListing({
         id: String(data.id),
         name: data.name ?? '',
@@ -245,9 +255,81 @@ export function ListingPage({ listingId }: { listingId: string }) {
         photos: data.photos ?? 4,
         description: data.description ?? '',
       } as Listing);
+
+      // Check user state
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setUserId(user.id);
+
+      // Check if saved
+      const { data: savedRow } = await supabase
+        .from('saved_listings')
+        .select('id')
+        .eq('buyer_id', user.id)
+        .eq('listing_id', listingId)
+        .maybeSingle();
+      setSaved(!!savedRow);
+
+      // Check if conversation exists
+      const { data: convo } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('buyer_id', user.id)
+        .eq('listing_id', listingId)
+        .maybeSingle();
+      setExpressed(!!convo);
+
+      // Check NDA status
+      const { data: nda } = await supabase
+        .from('ndas')
+        .select('status')
+        .eq('buyer_id', user.id)
+        .eq('listing_id', listingId)
+        .maybeSingle();
+      setNdaStatus(nda ? (nda.status === 'signed' ? 'signed' : 'pending') : 'none');
     }
     load();
   }, [listingId]);
+
+  async function handleSave() {
+    if (!userId) { router.push('/sign-in'); return; }
+    setActionLoading('save');
+    const supabase = createClient();
+    if (saved) {
+      await supabase.from('saved_listings').delete().eq('buyer_id', userId).eq('listing_id', listingId);
+      setSaved(false);
+    } else {
+      await supabase.from('saved_listings').insert({ buyer_id: userId, listing_id: listingId });
+      setSaved(true);
+    }
+    setActionLoading(null);
+  }
+
+  async function handleExpressInterest() {
+    if (!userId) { router.push(`/sign-in?next=/listing/${listingId}`); return; }
+    if (expressed) { router.push('/messages'); return; }
+    if (!sellerId || sellerId === userId) return;
+    setActionLoading('interest');
+    const supabase = createClient();
+    await supabase.from('conversations').insert({
+      listing_id: listingId,
+      buyer_id: userId,
+      seller_id: sellerId,
+    });
+    setExpressed(true);
+    setActionLoading(null);
+    router.push('/messages');
+  }
+
+  async function handleRequestDataRoom() {
+    if (!userId) { router.push(`/sign-in?next=/listing/${listingId}`); return; }
+    if (ndaStatus !== 'none') return;
+    setActionLoading('nda');
+    const supabase = createClient();
+    await supabase.from('ndas').insert({ buyer_id: userId, listing_id: listingId, status: 'pending' });
+    setNdaStatus('pending');
+    setActionLoading(null);
+  }
 
   if (listing === undefined) return (
     <div className="page-enter">
@@ -312,8 +394,12 @@ export function ListingPage({ listingId }: { listingId: string }) {
             </div>
           </div>
           <div className="row gap-2">
-            <Button variant="secondary" size="sm" icon={<Icon.Bookmark size={12} />}>Save</Button>
-            <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />}>Express interest</Button>
+            <Button variant="secondary" size="sm" icon={<Icon.Bookmark size={12} />} onClick={handleSave} disabled={actionLoading === 'save'}>
+              {saved ? 'Saved' : 'Save'}
+            </Button>
+            <Button variant="primary" size="sm" iconRight={<Icon.Arrow size={12} />} onClick={handleExpressInterest} disabled={actionLoading === 'interest'}>
+              {expressed ? 'View conversation' : 'Express interest'}
+            </Button>
           </div>
         </div>
       </section>
@@ -537,9 +623,23 @@ export function ListingPage({ listingId }: { listingId: string }) {
                 </div>
               </div>
               <div className="col gap-2">
-                <Button variant="primary" size="md" iconRight={<Icon.Arrow size={12} />}>Express interest</Button>
-                <Button variant="secondary" size="md" icon={<Icon.Message size={12} />}>Message seller</Button>
-                <Button variant="ghost" size="sm" icon={<Icon.Doc size={12} />}>Download teaser PDF</Button>
+                <Button variant="primary" size="md" iconRight={<Icon.Arrow size={12} />} onClick={handleExpressInterest} disabled={actionLoading === 'interest'}>
+                  {expressed ? 'View conversation' : 'Express interest'}
+                </Button>
+                <Button variant="secondary" size="md" icon={<Icon.Message size={12} />} onClick={() => expressed ? router.push('/messages') : handleExpressInterest()}>
+                  {expressed ? 'Go to messages' : 'Message seller'}
+                </Button>
+                {ndaStatus === 'none' && (
+                  <Button variant="ghost" size="sm" icon={<Icon.Doc size={12} />} onClick={handleRequestDataRoom} disabled={actionLoading === 'nda'}>
+                    Request data room
+                  </Button>
+                )}
+                {ndaStatus === 'pending' && (
+                  <div style={{ fontSize: 12, color: '#C8922A', padding: '6px 0' }}>⏳ Data room request pending</div>
+                )}
+                {ndaStatus === 'signed' && (
+                  <div style={{ fontSize: 12, color: '#00A86B', padding: '6px 0' }}>✓ Data room access granted</div>
+                )}
               </div>
               <p className="muted" style={{ fontSize: 11, lineHeight: 1.5 }}>
                 Expressing interest does not commit you to anything. A coordinator reviews your buyer profile before connecting you with the seller.
