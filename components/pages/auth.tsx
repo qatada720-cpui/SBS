@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Icon, SectionEyebrow, Field } from '@/components/ui';
@@ -195,7 +195,7 @@ export function SignUpPage() {
   );
 }
 
-export function SignInPage() {
+function SignInInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
@@ -259,5 +259,13 @@ export function SignInPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export function SignInPage() {
+  return (
+    <Suspense>
+      <SignInInner />
+    </Suspense>
   );
 }

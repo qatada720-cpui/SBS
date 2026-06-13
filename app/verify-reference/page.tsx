@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 
-export default function VerifyReferencePage() {
+function VerifyReferenceInner() {
   const params = useSearchParams();
   const token = params.get('token');
   const action = params.get('action');
@@ -48,5 +48,13 @@ export default function VerifyReferencePage() {
         <p style={{ fontSize: 14, color: '#777', lineHeight: 1.6 }}>{content.msg}</p>
       </div>
     </div>
+  );
+}
+
+export default function VerifyReferencePage() {
+  return (
+    <Suspense>
+      <VerifyReferenceInner />
+    </Suspense>
   );
 }
