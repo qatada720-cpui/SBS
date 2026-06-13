@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Icon, SectionEyebrow, Field } from '@/components/ui';
@@ -15,7 +15,7 @@ function ErrorBox({ msg }: { msg: string }) {
   );
 }
 
-export function ResetPasswordPage() {
+function ResetPasswordInner() {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -158,5 +158,13 @@ export function ResetPasswordPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordInner />
+    </Suspense>
   );
 }
