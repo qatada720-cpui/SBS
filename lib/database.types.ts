@@ -18,6 +18,7 @@ export type ListingRow = {
   status: 'draft' | 'pending_review' | 'live' | 'under_offer' | 'sold' | 'rejected';
   rejection_reason: string | null;
   phases: Json | null;
+  documents: Json | null;
   reviewed_at: string | null;
   reviewed_by: string | null;
   photos: string[];
@@ -27,6 +28,46 @@ export type ListingRow = {
 
 export type ListingInsert = Omit<ListingRow, 'id' | 'created_at' | 'updated_at' | 'verified' | 'premium'>;
 export type ListingUpdate = Partial<ListingRow>;
+
+export type KnowledgeTransferRow = {
+  id: string;
+  conversation_id: string;
+  listing_id: string;
+  seller_id: string;
+  buyer_id: string;
+  form: Json;
+  status: 'draft' | 'submitted' | 'approved';
+  submitted_at: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DealAgreementRow = {
+  id: string;
+  conversation_id: string;
+  status: 'draft' | 'active' | 'completed' | 'dissolved';
+  dissolution_clause: string;
+  dissolution_notice_days: number;
+  dissolution_reason: string | null;
+  dissolved_at: string | null;
+  buyer_signed_at: string | null;
+  seller_signed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DealAgreementPhaseRow = {
+  id: string;
+  agreement_id: string;
+  position: number;
+  title: string;
+  description: string | null;
+  ownership_percentage: number;
+  status: 'pending' | 'active' | 'completed';
+  completed_at: string | null;
+  created_at: string;
+};
 
 export interface Database {
   public: {
@@ -84,6 +125,7 @@ export interface Database {
           seller_id: string;
           nda_signed_buyer: boolean;
           nda_signed_seller: boolean;
+          current_phase: number;
           status: 'active' | 'offer_made' | 'closed' | 'archived';
           created_at: string;
           updated_at: string;
@@ -132,6 +174,40 @@ export interface Database {
           status?: 'pending' | 'accepted' | 'rejected' | 'countered' | 'withdrawn';
         };
         Update: Partial<Database['public']['Tables']['offers']['Insert']>;
+      };
+      knowledge_transfers: {
+        Row: KnowledgeTransferRow;
+        Insert: {
+          conversation_id: string;
+          listing_id: string;
+          seller_id: string;
+          buyer_id: string;
+          form?: Json;
+          status?: 'draft' | 'submitted' | 'approved';
+        };
+        Update: Partial<Omit<KnowledgeTransferRow, 'id' | 'created_at' | 'updated_at'>>;
+      };
+      deal_agreements: {
+        Row: DealAgreementRow;
+        Insert: {
+          conversation_id: string;
+          status?: 'draft' | 'active' | 'completed' | 'dissolved';
+          dissolution_clause?: string;
+          dissolution_notice_days?: number;
+        };
+        Update: Partial<Omit<DealAgreementRow, 'id' | 'created_at' | 'updated_at'>>;
+      };
+      deal_agreement_phases: {
+        Row: DealAgreementPhaseRow;
+        Insert: {
+          agreement_id: string;
+          position: number;
+          title: string;
+          description?: string | null;
+          ownership_percentage: number;
+          status?: 'pending' | 'active' | 'completed';
+        };
+        Update: Partial<Omit<DealAgreementPhaseRow, 'id' | 'created_at'>>;
       };
     };
     Views: Record<string, never>;

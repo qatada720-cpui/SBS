@@ -9,6 +9,8 @@ import { createClient as _createClient } from '@/lib/supabase-browser';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createClient = () => _createClient() as any;
 
+const PAGE_SIZE = 18;
+
 const PRICE_RANGES = [
   { label: 'Any price', min: 0, max: 0 },
   { label: '< €500K', min: 0, max: 500_000 },
@@ -51,6 +53,8 @@ export function MarketplacePage({ searchParams = {} }: { searchParams?: Record<s
   const [verifiedOnly, setVerifiedOnly] = useState(searchParams.verified === 'true');
 const [sort, setSort] = useState(searchParams.sort ?? 'score');
 
+  const [page, setPage] = useState(Number(searchParams.page ?? 1));
+
   const [listings, setListings] = useState<Listing[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -58,21 +62,24 @@ const [sort, setSort] = useState(searchParams.sort ?? 'score');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function pushUrl(overrides: Record<string, string>) {
-    const p: Record<string, string> = { q, sector, price: priceRange, sort, verified: String(verifiedOnly), ...overrides };
+    const p: Record<string, string> = { q, sector, price: priceRange, sort, verified: String(verifiedOnly), page: String(page), ...overrides };
     const sp = new URLSearchParams();
     if (p.q) sp.set('q', p.q);
     if (p.sector && p.sector !== 'All sectors') sp.set('sector', p.sector);
     if (p.price && p.price !== 'Any price') sp.set('price', p.price);
     if (p.sort && p.sort !== 'score') sp.set('sort', p.sort);
     if (p.verified === 'true') sp.set('verified', 'true');
+    if (p.page && p.page !== '1') sp.set('page', p.page);
     const qs = sp.toString();
     router.replace(qs ? `/marketplace?${qs}` : '/marketplace', { scroll: false });
   }
 
-  const fetchListings = useCallback(async (search: string) => {
+  const fetchListings = useCallback(async (search: string, pageNum: number) => {
     setLoading(true);
     const supabase = createClient();
     const range = PRICE_RANGES.find(r => r.label === priceRange) ?? PRICE_RANGES[0];
+    const from = (pageNum - 1) * PAGE_SIZE;
+    const to = pageNum * PAGE_SIZE - 1;
 
     let query = supabase
       .from('listings')
@@ -90,23 +97,33 @@ const [sort, setSort] = useState(searchParams.sort ?? 'score');
     else if (sort === 'price_desc') query = query.order('asking_price', { ascending: false });
     else if (sort === 'newest') query = query.order('created_at', { ascending: false });
 
+    query = query.range(from, to);
+
     const { data, count } = await query;
     setListings((data ?? []).map((r: DbListing) => toCard(r)));
     setTotal(count ?? 0);
     setLoading(false);
   }, [sector, priceRange, verifiedOnly, sort]);
 
-  // Debounce search input, immediate for other filters
+  // Debounce search input; re-fetch when page or filters change
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchListings(q), 300);
+    debounceRef.current = setTimeout(() => fetchListings(q, page), 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [q, fetchListings]);
+  }, [q, page, fetchListings]);
 
   function resetFilters() {
     setQ(''); setSector('All sectors'); setPriceRange('Any price');
-    setVerifiedOnly(false); setSort('score');
+    setVerifiedOnly(false); setSort('score'); setPage(1);
     router.replace('/marketplace', { scroll: false });
+  }
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  function goToPage(p: number) {
+    setPage(p);
+    pushUrl({ page: String(p) });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   const hasActiveFilters = q || sector !== 'All sectors' || priceRange !== 'Any price' || verifiedOnly;
@@ -125,14 +142,14 @@ const [sort, setSort] = useState(searchParams.sort ?? 'score');
                 <Icon.Search size={14} />
                 <input
                   value={q}
-                  onChange={e => { setQ(e.target.value); pushUrl({ q: e.target.value }); }}
+                  onChange={e => { setQ(e.target.value); setPage(1); pushUrl({ q: e.target.value, page: '1' }); }}
                   placeholder="Search by name or description"
                   style={{ border: 'none', padding: 0, height: '100%', background: 'transparent', fontSize: 13 }}
                 />
               </div>
               <select
                 value={sort}
-                onChange={e => { setSort(e.target.value); pushUrl({ sort: e.target.value }); }}
+                onChange={e => { setSort(e.target.value); setPage(1); pushUrl({ sort: e.target.value, page: '1' }); }}
                 style={{ height: 36, padding: '0 12px', fontSize: 13, width: 'auto', appearance: 'none', background: 'transparent' }}
               >
                 <option value="score">Sort: Listing score</option>
@@ -150,20 +167,20 @@ const [sort, setSort] = useState(searchParams.sort ?? 'score');
           <div className="row gap-2 scroll-x">
             {SECTORS.map(s => (
               <button key={s} className={`chip ${sector === s ? 'active' : ''}`}
-                onClick={() => { setSector(s); pushUrl({ sector: s }); }}>{s}</button>
+                onClick={() => { setSector(s); setPage(1); pushUrl({ sector: s, page: '1' }); }}>{s}</button>
             ))}
           </div>
           <div className="row" style={{ justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div className="row gap-2">
               {PRICE_RANGES.map(r => (
                 <button key={r.label} className={`chip ${priceRange === r.label ? 'active' : ''}`}
-                  onClick={() => { setPriceRange(r.label); pushUrl({ price: r.label }); }}>{r.label}</button>
+                  onClick={() => { setPriceRange(r.label); setPage(1); pushUrl({ price: r.label, page: '1' }); }}>{r.label}</button>
               ))}
             </div>
             <div className="row gap-3">
               <label className="row gap-2" style={{ fontSize: 13, cursor: 'pointer', color: verifiedOnly ? 'var(--fg)' : 'var(--subtle)' }}>
                 <input type="checkbox" checked={verifiedOnly}
-                  onChange={e => { setVerifiedOnly(e.target.checked); pushUrl({ verified: String(e.target.checked) }); }}
+                  onChange={e => { setVerifiedOnly(e.target.checked); setPage(1); pushUrl({ verified: String(e.target.checked), page: '1' }); }}
                   style={{ width: 14, height: 14, accentColor: 'var(--blue)' }} />
                 Verified only
               </label>
@@ -205,10 +222,59 @@ const [sort, setSort] = useState(searchParams.sort ?? 'score');
               <Button variant="secondary" size="sm" onClick={resetFilters}>Reset filters</Button>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              {listings.map(l => (
-                <ListingCard key={l.id} listing={l} href={`/listing/${l.id}`} />
-              ))}
+            <div className="col gap-10">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                {listings.map(l => (
+                  <ListingCard key={l.id} listing={l} href={`/listing/${l.id}`} />
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="row" style={{ justifyContent: 'center', gap: 4 }}>
+                  <button
+                    onClick={() => goToPage(page - 1)}
+                    disabled={page === 1}
+                    style={{ padding: '6px 14px', fontSize: 13, borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1 }}
+                  >
+                    ← Prev
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                    .reduce<(number | '…')[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && typeof arr[idx - 1] === 'number' && (p as number) - (arr[idx - 1] as number) > 1) acc.push('…');
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((item, idx) =>
+                      item === '…' ? (
+                        <span key={`ellipsis-${idx}`} style={{ padding: '6px 10px', fontSize: 13, color: 'var(--muted)' }}>…</span>
+                      ) : (
+                        <button
+                          key={item}
+                          onClick={() => goToPage(item as number)}
+                          style={{
+                            padding: '6px 12px', fontSize: 13, borderRadius: 6,
+                            border: '0.5px solid var(--border)',
+                            background: item === page ? 'var(--fg)' : 'transparent',
+                            color: item === page ? 'var(--bg)' : 'var(--fg)',
+                            cursor: 'pointer', fontWeight: item === page ? 600 : 400,
+                          }}
+                        >
+                          {item}
+                        </button>
+                      )
+                    )}
+
+                  <button
+                    onClick={() => goToPage(page + 1)}
+                    disabled={page === totalPages}
+                    style={{ padding: '6px 14px', fontSize: 13, borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1 }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -446,7 +512,6 @@ export function ListingPage({ listingId }: { listingId: string }) {
                 { id: 'overview', l: 'Overview' },
                 { id: 'phases', l: 'Phased ownership' },
                 { id: 'financials', l: 'Financials' },
-                { id: 'reviews', l: 'Buyer reviews' },
               ].map(t => (
                 <button key={t.id} onClick={() => setTab(t.id)}
                   style={{
@@ -583,16 +648,6 @@ export function ListingPage({ listingId }: { listingId: string }) {
               </div>
             )}
 
-            {tab === 'reviews' && (
-              <div className="col gap-6">
-                <div className="col gap-3">
-                  <h3>Buyer reviews</h3>
-                </div>
-                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--muted)', fontSize: 14 }}>
-                  No reviews yet for this listing.
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Right: sidebar */}

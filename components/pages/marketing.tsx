@@ -55,12 +55,15 @@ function detectCoveredTopics(messages: ChatMessage[]): Set<string> {
   return covered;
 }
 
+const AHMED_KEY = 'sbs_ahmed_v1';
+
 export function HomePage() {
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([
     { from: 'bot', text: AHMED_OPENING },
   ]);
   const [groqHistory, setGroqHistory] = useState<GroqMessage[]>([]);
+  const [hydrated, setHydrated] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [, startTransition] = useTransition();
   const [navigating, setNavigating] = useState(false);
@@ -69,6 +72,39 @@ export function HomePage() {
   const userAnswerCount = messages.filter((m) => m.from === 'user').length;
   const coveredTopics = detectCoveredTopics(messages);
   const topicsCount = coveredTopics.size;
+
+  // Restore conversation from localStorage after hydration
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(AHMED_KEY);
+      if (raw) {
+        const { messages: saved, groqHistory: savedHistory } = JSON.parse(raw);
+        if (Array.isArray(saved) && saved.length > 1) {
+          setMessages(saved.filter((m: ChatMessage) => !m.searching));
+          setGroqHistory(savedHistory ?? []);
+        }
+      }
+    } catch {}
+    setHydrated(true);
+  }, []);
+
+  // Persist after each complete exchange (groqHistory updates once per exchange, not during typewriter)
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(AHMED_KEY, JSON.stringify({
+        messages: messages.filter(m => !m.searching),
+        groqHistory,
+      }));
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groqHistory, hydrated]);
+
+  function clearConversation() {
+    try { localStorage.removeItem(AHMED_KEY); } catch {}
+    setMessages([{ from: 'bot', text: AHMED_OPENING }]);
+    setGroqHistory([]);
+  }
 
   // Prevent body scroll on home page
   useEffect(() => {
@@ -210,9 +246,17 @@ export function HomePage() {
               })}
             </div>
             {userAnswerCount > 0 && (
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                {topicsCount} of {PROFILE_TOPICS.length} profile topics covered
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  {topicsCount} of {PROFILE_TOPICS.length} profile topics covered
+                </span>
+                <button
+                  onClick={clearConversation}
+                  style={{ fontSize: 11, color: 'var(--muted)', cursor: 'pointer', textDecoration: 'underline', background: 'none', border: 'none', padding: 0 }}
+                >
+                  Clear
+                </button>
+              </div>
             )}
           </div>
 
@@ -670,6 +714,150 @@ export function AboutPage() {
         </div>
       </section>
 
+    </div>
+  );
+}
+
+export function PrivacyPage() {
+  return (
+    <div className="page-enter">
+      <section style={{ padding: '96px 0 64px' }}>
+        <div className="container col gap-4" style={{ maxWidth: 720 }}>
+          <SectionEyebrow>Legal</SectionEyebrow>
+          <h1 style={{ fontSize: 48, letterSpacing: -1.5 }}>Privacybeleid</h1>
+          <p style={{ fontSize: 14, color: 'var(--muted)' }}>Versie 1.0 — Ingangsdatum: 13 juni 2026</p>
+        </div>
+      </section>
+
+      <section style={{ paddingBottom: 96 }}>
+        <div className="container col gap-8" style={{ maxWidth: 720 }}>
+          {[
+            {
+              title: '1. Verwerkingsverantwoordelijke',
+              body: 'SafeBusinessSelling B.V. (KvK-nummer: [in te vullen], BTW: [in te vullen]), gevestigd aan Keizersgracht 124, 1015 CW Amsterdam, Nederland, is verantwoordelijk voor de verwerking van uw persoonsgegevens. Vragen? Mail naar privacy@safebusinessselling.com.',
+            },
+            {
+              title: '2. Welke gegevens verzamelen wij?',
+              body: 'Wij verwerken de volgende categorieën persoonsgegevens: (a) Accountgegevens — naam, e-mailadres, wachtwoord (gehasht); (b) Identiteitsverificatie — kopie identiteitsbewijs, uittreksel KvK, bankgegevens voor escrow; (c) Bedrijfs- en financiële gegevens — jaarrekeningen, omzetcijfers, EBITDA, die verkopers uploaden in het kader van listingverificatie; (d) Communicatie — berichten uitgewisseld via het platformberichtencentrum; (e) Gebruiksgegevens — IP-adres, browsertype, bezochte pagina\'s en tijdstempels, vastgelegd via cookies en serverlogboeken.',
+            },
+            {
+              title: '3. Doeleinden en rechtsgronden (AVG art. 6)',
+              body: 'Wij verwerken uw gegevens op basis van: (a) Uitvoering van een overeenkomst (art. 6 lid 1 sub b) — accountbeheer, verificatieproces, deal-coördinatie en escrowbeheer; (b) Gerechtvaardigd belang (art. 6 lid 1 sub f) — fraudepreventie, platformbeveiliging en verbetering van onze diensten; (c) Wettelijke verplichting (art. 6 lid 1 sub c) — voldoen aan anti-witwasregelgeving (Wwft) en fiscale verplichtingen; (d) Toestemming (art. 6 lid 1 sub a) — marketing-e-mails, waarvoor u zich te allen tijde kunt afmelden.',
+            },
+            {
+              title: '4. Bewaartermijnen',
+              body: 'Accountgegevens worden bewaard zolang uw account actief is, plus 2 jaar na verwijdering. Financiële documenten en dealgegevens bewaren wij 7 jaar op grond van fiscale verplichtingen (art. 52 AWR). Berichten worden 2 jaar na afsluiting van een deal bewaard. Logboeken en cookies worden maximaal 13 maanden bewaard.',
+            },
+            {
+              title: '5. Ontvangers van uw gegevens',
+              body: 'Wij delen uw gegevens uitsluitend met: (a) Geverifieerde tegenpartijen — een koper ontvangt uw bedrijfsgegevens uitsluitend nadat een NDA is getekend en escrow-deposito is gestort; (b) Verwerkers — hostingpartners (Supabase/AWS, EU-regio), escrow-dienstverlener, en geaccrediteerde adviseurs die u zelf boekt; (c) Toezichthouders — de AFM, Belastingdienst of justitiële autoriteiten indien wettelijk verplicht. Wij verkopen uw gegevens nooit aan derden.',
+            },
+            {
+              title: '6. Internationale doorgifte',
+              body: 'Uw gegevens worden verwerkt binnen de Europese Economische Ruimte (EER). Indien een verwerker buiten de EER is gevestigd, zullen wij passende waarborgen treffen (standaard contractbepalingen van de Europese Commissie).',
+            },
+            {
+              title: '7. Uw rechten',
+              body: 'Op grond van de AVG heeft u de volgende rechten: inzage (art. 15), rectificatie (art. 16), wissing (art. 17), beperking van de verwerking (art. 18), gegevensoverdraagbaarheid (art. 20) en bezwaar (art. 21). Dien uw verzoek in via privacy@safebusinessselling.com. Wij reageren binnen 30 dagen. U heeft tevens het recht een klacht in te dienen bij de Autoriteit Persoonsgegevens (autoriteitpersoonsgegevens.nl).',
+            },
+            {
+              title: '8. Cookies',
+              body: 'Wij gebruiken functionele cookies (noodzakelijk voor sessie- en authenticatiebeheer) en analytische cookies (anoniem, voor het meten van paginabezoeken). Wij gebruiken geen trackingcookies van derden voor advertentiedoeleinden. U kunt cookievoorkeuren aanpassen via uw browserinstellingen.',
+            },
+            {
+              title: '9. Beveiliging',
+              body: 'Wij treffen passende technische en organisatorische maatregelen: versleuteld datatransport (TLS 1.3), versleutelde opslag voor gevoelige documenten, row-level security op databaseniveau, en periodieke penetratietests. Bij een datalek dat een risico vormt voor uw rechten, informeren wij u en de AP binnen 72 uur.',
+            },
+            {
+              title: '10. Wijzigingen',
+              body: 'Wij kunnen dit beleid aanpassen. Materiële wijzigingen worden minimaal 30 dagen van tevoren per e-mail aangekondigd. De meest actuele versie is altijd beschikbaar op safebusinessselling.com/privacy.',
+            },
+            {
+              title: '11. Contact',
+              body: 'Voor privacyvragen of het uitoefenen van uw rechten: privacy@safebusinessselling.com of schriftelijk aan SafeBusinessSelling B.V., t.a.v. Privacy Officer, Keizersgracht 124, 1015 CW Amsterdam.',
+            },
+          ].map(s => (
+            <div key={s.title} className="col gap-3" style={{ paddingBottom: 32, borderBottom: '0.5px solid var(--border)' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 500 }}>{s.title}</h3>
+              <p style={{ fontSize: 14, color: 'var(--subtle)', lineHeight: 1.75, fontWeight: 300 }}>{s.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function TermsPage() {
+  return (
+    <div className="page-enter">
+      <section style={{ padding: '96px 0 64px' }}>
+        <div className="container col gap-4" style={{ maxWidth: 720 }}>
+          <SectionEyebrow>Legal</SectionEyebrow>
+          <h1 style={{ fontSize: 48, letterSpacing: -1.5 }}>Algemene Voorwaarden</h1>
+          <p style={{ fontSize: 14, color: 'var(--muted)' }}>Versie 1.0 — Ingangsdatum: 13 juni 2026</p>
+        </div>
+      </section>
+
+      <section style={{ paddingBottom: 96 }}>
+        <div className="container col gap-8" style={{ maxWidth: 720 }}>
+          {[
+            {
+              title: '1. Definities',
+              body: '"Platform" betekent de online marktplaats van SafeBusinessSelling B.V. (hierna: SBS), toegankelijk via safebusinessselling.com. "Verkoper" is een onderneming of natuurlijke persoon die een bedrijf te koop aanbiedt via het Platform. "Koper" is een natuurlijke persoon of rechtspersoon die via het Platform een bedrijf wil verwerven. "Deal" is het geheel van afspraken omtrent de overdracht van een bedrijf, begeleid door SBS.',
+            },
+            {
+              title: '2. Toepasselijkheid',
+              body: 'Deze Algemene Voorwaarden zijn van toepassing op elk gebruik van het Platform en op alle overeenkomsten tussen SBS en Gebruikers. Door een account aan te maken accepteert u deze voorwaarden. SBS behoudt het recht deze voorwaarden te wijzigen; gewijzigde voorwaarden gelden 30 dagen na aankondiging per e-mail.',
+            },
+            {
+              title: '3. Account en toegang',
+              body: 'U bent minimaal 18 jaar en handelingsbevoegd om een account aan te maken. U bent verantwoordelijk voor de vertrouwelijkheid van uw inloggegevens. Elk account is strikt persoonlijk en niet overdraagbaar. SBS mag accounts opschorten of beëindigen bij vermoed misbruik, fraude of schending van deze voorwaarden.',
+            },
+            {
+              title: '4. Verplichtingen van de Verkoper',
+              body: 'Verkopers garanderen dat alle aangeleverde informatie (financiën, eigendomsstructuur, contracten) juist en volledig is. Het is verboden een bedrijf te listen waarvan u niet de rechtmatige eigenaar of gemachtigde vertegenwoordiger bent. SBS verifieert listings maar is niet aansprakelijk voor onjuistheden die een Verkoper opzettelijk of onopzettelijk verstrekt. Verkopers mogen buiten het Platform om geen deal sluiten met een Koper die via het Platform is geïntroduceerd, gedurende een periode van 24 maanden na eerste contact.',
+            },
+            {
+              title: '5. Verplichtingen van de Koper',
+              body: 'Kopers erkennen dat alle informatie die zij ontvangen na ondertekening van de NDA strikt vertrouwelijk is. Het doorsturen of anderszins openbaar maken van vertrouwelijke bedrijfsinformatie is verboden en kan leiden tot aansprakelijkheid. Kopers dienen hun escrow-deposito tijdig te storten conform de deal-voorwaarden.',
+            },
+            {
+              title: '6. Vergoedingen',
+              body: 'SBS rekent een succesfee van 3% van de transactiewaarde, verschuldigd bij closing. De fee wordt automatisch verrekend via de escrow. Er zijn geen maandelijkse kosten of listingkosten. Bij annulering vóór closing zijn geen fees verschuldigd, tenzij annulering verwijtbaar is aan de betreffende partij conform de deal-overeenkomst.',
+            },
+            {
+              title: '7. Escrow en betalingen',
+              body: 'Alle transactiegelden worden beheerd via een door SBS gecontracteerde, gecertificeerde escrow-dienstverlener. SBS geeft nooit directe instructies om buiten escrow te betalen. Fondsen worden vrijgegeven per eigendomsfase op basis van vooraf overeengekomen KPI\'s en mijlpalen. SBS is niet aansprakelijk voor vertragingen door de escrow-dienstverlener buiten de macht van SBS.',
+            },
+            {
+              title: '8. Aansprakelijkheid',
+              body: 'SBS is een facilitator en geen partij bij de koopovereenkomst tussen Koper en Verkoper. SBS is niet aansprakelijk voor directe of indirecte schade voortvloeiend uit beslissingen op basis van listings of adviezen op het Platform, behoudens opzet of grove nalatigheid van SBS. De aansprakelijkheid van SBS is in alle gevallen beperkt tot het bedrag dat SBS heeft ontvangen aan fees in verband met de betreffende transactie.',
+            },
+            {
+              title: '9. Intellectueel eigendom',
+              body: 'Alle intellectuele eigendomsrechten op het Platform (software, ontwerp, merkbeelden) berusten bij SBS. Gebruikers behouden hun eigen rechten op de documenten die zij uploaden. Door documenten te uploaden verleent u SBS een beperkte, niet-exclusieve licentie om die documenten te verwerken ten behoeve van verificatie en dealcoördinatie.',
+            },
+            {
+              title: '10. Verboden gebruik',
+              body: 'Het is verboden het Platform te gebruiken voor het verspreiden van malware, het uitvoeren van scrapers of geautomatiseerde queries zonder toestemming van SBS, het omzeilen van beveiligingsmaatregelen, het plaatsen van fictieve listings, of het lastigvallen van andere Gebruikers.',
+            },
+            {
+              title: '11. Toepasselijk recht en geschillen',
+              body: 'Op deze voorwaarden is uitsluitend Nederlands recht van toepassing. Geschillen worden voorgelegd aan de bevoegde rechter te Amsterdam, tenzij partijen besluiten gebruik te maken van mediation via het Nederlands Mediation Instituut.',
+            },
+            {
+              title: '12. Contact',
+              body: 'Voor vragen over deze voorwaarden: hello@safebusinessselling.com of SafeBusinessSelling B.V., Keizersgracht 124, 1015 CW Amsterdam, Nederland.',
+            },
+          ].map(s => (
+            <div key={s.title} className="col gap-3" style={{ paddingBottom: 32, borderBottom: '0.5px solid var(--border)' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 500 }}>{s.title}</h3>
+              <p style={{ fontSize: 14, color: 'var(--subtle)', lineHeight: 1.75, fontWeight: 300 }}>{s.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

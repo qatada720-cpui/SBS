@@ -7,6 +7,9 @@ export const ROUTES = {
   messages: '/messages',
   about: '/about',
   contact: '/contact',
+  privacy: '/privacy',
+  terms: '/terms',
+  settings: '/settings',
   'sign-in': '/sign-in',
   'sign-up': '/sign-up',
   'forgot-password': '/forgot-password',
@@ -27,6 +30,7 @@ export const NAV_LINKS: { id: PageId; label: string; href: string }[] = [
   { id: 'about', label: 'About', href: '/about' },
   { id: 'how', label: 'How it works', href: '/how' },
   { id: 'marketplace', label: 'Marketplace', href: '/marketplace' },
+  { id: 'ai-match', label: 'AI Match', href: '/ai-match' },
 ];
 
 export const FOOTER_LINKS: Record<string, string> = {
@@ -41,4 +45,6 @@ export const FOOTER_LINKS: Record<string, string> = {
   'buyer-dashboard': '/buyer/dashboard',
   about: '/about',
   contact: '/contact',
+  privacy: '/privacy',
+  terms: '/terms',
 };

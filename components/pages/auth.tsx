@@ -54,7 +54,7 @@ function OtpInput({ onComplete }: { onComplete: (code: string) => void }) {
   }
 
   return (
-    <div className="row" style={{ gap: 8, justifyContent: 'center' }}>
+    <div className="row" role="group" aria-label="One-time code" style={{ gap: 8, justifyContent: 'center' }}>
       {digits.map((d, i) => (
         <input
           key={i}
@@ -63,6 +63,7 @@ function OtpInput({ onComplete }: { onComplete: (code: string) => void }) {
           inputMode="numeric"
           maxLength={1}
           value={d}
+          aria-label={`Digit ${i + 1} of 6`}
           onChange={e => handleChange(i, e.target.value)}
           onKeyDown={e => handleKeyDown(i, e)}
           onPaste={handlePaste}
@@ -78,12 +79,19 @@ function OtpInput({ onComplete }: { onComplete: (code: string) => void }) {
   );
 }
 
+const ROLES = [
+  { value: 'buyer',  label: 'Buying',  desc: 'I want to acquire a business',  icon: '🔍' },
+  { value: 'seller', label: 'Selling', desc: 'I want to sell my business',      icon: '🏢' },
+  { value: 'both',   label: 'Both',    desc: 'I\'m open to buying and selling', icon: '↕️' },
+] as const;
+
 export function SignUpPage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [role, setRole] = useState<'buyer' | 'seller' | 'both'>('buyer');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -97,7 +105,7 @@ export function SignUpPage() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name } },
+      options: { data: { full_name: name, role } },
     });
     if (error) { setError(error.message); setLoading(false); return; }
     router.push('/dashboard');
@@ -107,17 +115,50 @@ export function SignUpPage() {
   return (
     <div className="page-enter">
       <section style={{ padding: '96px 0 80px' }}>
-        <div className="container" style={{ maxWidth: 440, margin: '0 auto' }}>
+        <div className="container" style={{ maxWidth: 480, margin: '0 auto' }}>
           <div className="col gap-4" style={{ marginBottom: 32, textAlign: 'center' }}>
             <SectionEyebrow>Sign up</SectionEyebrow>
             <h1 style={{ fontSize: 40, letterSpacing: -1.2 }}>Create your account</h1>
             <p style={{ fontSize: 15, color: 'var(--subtle)', fontWeight: 300, lineHeight: 1.6 }}>
-              Create your account and start buying or selling businesses on SafeBusinessSelling.
+              One account for buying and selling businesses on SafeBusinessSelling.
             </p>
           </div>
 
           <div className="card col gap-4" style={{ padding: 36 }}>
             <form className="col gap-4" onSubmit={handleSubmit}>
+
+              <Field label="What are you here for?">
+                <div role="radiogroup" aria-label="Account type" className="col gap-2" style={{ marginTop: 4 }}>
+                  {ROLES.map(r => (
+                    <button
+                      key={r.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={role === r.value}
+                      onClick={() => setRole(r.value)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '12px 16px', borderRadius: 10,
+                        border: role === r.value ? '1.5px solid var(--fg)' : '0.5px solid var(--border-strong)',
+                        background: role === r.value ? 'var(--surface-2)' : 'transparent',
+                        cursor: 'pointer', textAlign: 'left',
+                      }}
+                    >
+                      <span style={{ fontSize: 20 }}>{r.icon}</span>
+                      <div className="col" style={{ gap: 2 }}>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>{r.label}</span>
+                        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{r.desc}</span>
+                      </div>
+                      <span style={{
+                        marginLeft: 'auto', width: 16, height: 16, borderRadius: '50%',
+                        border: role === r.value ? '4px solid var(--fg)' : '1.5px solid var(--border-strong)',
+                        flexShrink: 0,
+                      }} />
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
               <Field label="Full name">
                 <input value={name} onChange={e => setName(e.target.value)} placeholder="Full name" required autoComplete="name" />
               </Field>
@@ -133,10 +174,10 @@ export function SignUpPage() {
               {error && <ErrorBox msg={error} />}
               <p style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
                 By signing up you agree to our{' '}
-                <Link href="/contact" style={{ color: 'var(--subtle)' }}>Terms</Link>{' '}and{' '}
-                <Link href="/contact" style={{ color: 'var(--subtle)' }}>Privacy Policy</Link>.
+                <Link href="/terms" style={{ color: 'var(--subtle)' }}>Terms</Link>{' '}and{' '}
+                <Link href="/privacy" style={{ color: 'var(--subtle)' }}>Privacy Policy</Link>.
               </p>
-              <Button variant="primary" type="submit" size="lg" disabled={loading} iconRight={loading ? undefined : <Icon.Arrow size={14} />} style={{ width: '100%', marginTop: 4 }}>
+              <Button variant="primary" type="submit" size="lg" disabled={loading} aria-busy={loading} iconRight={loading ? undefined : <Icon.Arrow size={14} />} style={{ width: '100%', marginTop: 4 }}>
                 {loading ? 'Creating account…' : 'Create account'}
               </Button>
             </form>
@@ -195,7 +236,10 @@ export function SignInPage() {
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your password" required autoComplete="current-password" />
               </Field>
               {error && <ErrorBox msg={error} />}
-              <Button variant="primary" type="submit" size="lg" disabled={loading} iconRight={loading ? undefined : <Icon.Arrow size={14} />} style={{ width: '100%', marginTop: 8 }}>
+              <div className="row" style={{ justifyContent: 'flex-end' }}>
+                <Link href="/forgot-password" style={{ fontSize: 12, color: 'var(--muted)' }}>Forgot password?</Link>
+              </div>
+              <Button variant="primary" type="submit" size="lg" disabled={loading} aria-busy={loading} iconRight={loading ? undefined : <Icon.Arrow size={14} />} style={{ width: '100%', marginTop: 8 }}>
                 {loading ? 'Signing in…' : 'Sign in'}
               </Button>
             </form>

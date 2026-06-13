@@ -18,7 +18,8 @@
     "next": "^16.2.6",
     "pg": "^8.21.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "resend": "^6.12.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",

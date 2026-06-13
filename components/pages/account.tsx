@@ -231,6 +231,69 @@ function SectorPicker({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
+function ReferenceForm({ onAdd, sellerName }: { onAdd: (r: { name: string; company: string; email: string; status: string }) => void; sellerName: string }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [company, setCompany] = useState('');
+  const [email, setEmail] = useState('');
+  const [sending, setSending] = useState(false);
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="row hair gap-3"
+        style={{ padding: '10px 14px', borderRadius: 8, color: 'var(--muted)', cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ width: 20, height: 20, borderRadius: '50%', border: '0.5px solid var(--border-strong)', display: 'grid', placeItems: 'center' }}>
+          <Icon.Plus size={10} />
+        </span>
+        <span style={{ fontSize: 13 }}>Add reference</span>
+      </button>
+    );
+  }
+
+  async function handleAdd() {
+    if (!name || !email) return;
+    setSending(true);
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setSending(false); return; }
+
+    const { data: ref } = await supabase
+      .from('trade_references')
+      .insert({ seller_id: session.user.id, name, company, email })
+      .select('token')
+      .single();
+
+    if (ref?.token) {
+      await fetch('/api/send-reference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, company, email, sellerName, token: ref.token }),
+      });
+    }
+
+    onAdd({ name, company, email, status: 'pending' });
+    setName(''); setCompany(''); setEmail('');
+    setOpen(false); setSending(false);
+  }
+
+  return (
+    <div className="col hair gap-3" style={{ padding: 14, borderRadius: 8 }}>
+      <div className="row gap-2">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Name *" style={{ flex: 1, fontSize: 13, padding: '8px 10px', borderRadius: 6, border: '0.5px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--fg)' }} />
+        <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Company" style={{ flex: 1, fontSize: 13, padding: '8px 10px', borderRadius: 6, border: '0.5px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--fg)' }} />
+      </div>
+      <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email *" type="email" style={{ fontSize: 13, padding: '8px 10px', borderRadius: 6, border: '0.5px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--fg)' }} />
+      <div className="row gap-2">
+        <Button variant="primary" size="sm" disabled={!name || !email || sending}
+          onClick={handleAdd}>
+          {sending ? 'Sending…' : 'Add & send invite'}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
+
 export function SellerOnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -248,8 +311,8 @@ export function SellerOnboardingPage() {
     description: '',
     financialsUploaded: '' as string,
     taxFilingsUploaded: '' as string,
-    photosUploaded: 0,
-    referencesAdded: 0,
+    photoUrls: [] as string[],
+    references: [] as { name: string; company: string; email: string; status: string }[],
     phasedAccepted: false,
     customPhases: [
       { title: 'LOI & Discovery', ownership: 0 },
@@ -276,8 +339,8 @@ export function SellerOnboardingPage() {
     if (form.financialsUploaded) s += 15;
     if (form.taxFilingsUploaded) s += 10;
     if (form.description && form.description.length > 40) s += 10;
-    if (form.photosUploaded >= 3) s += 10;
-    if (form.referencesAdded >= 3) s += 5;
+    if (form.photoUrls.length >= 3) s += 10;
+    if (form.references.length >= 3) s += 5;
     if (form.phasedAccepted) s += 10;
     if (step >= steps.length - 1 && form.financialsUploaded) s += 5;
     return Math.min(100, s);
@@ -289,8 +352,8 @@ export function SellerOnboardingPage() {
     { label: '3 years of financials uploaded', weight: 15, done: !!form.financialsUploaded },
     { label: 'Tax filings uploaded', weight: 10, done: !!form.taxFilingsUploaded },
     { label: 'AI narrative approved', weight: 10, done: form.description.length > 40 },
-    { label: '3+ photos uploaded', weight: 10, done: form.photosUploaded >= 3 },
-    { label: '3+ trade references', weight: 5, done: form.referencesAdded >= 3 },
+    { label: '3+ photos uploaded', weight: 10, done: form.photoUrls.length >= 3 },
+    { label: '3+ trade references', weight: 5, done: form.references.length >= 3 },
     { label: 'Phased ownership signed', weight: 10, done: form.phasedAccepted },
     { label: 'Submitted for verification', weight: 5, done: step >= steps.length - 1 && !!form.financialsUploaded },
   ];
@@ -300,7 +363,7 @@ export function SellerOnboardingPage() {
     financials: !!(form.revenue && form.ebitda && form.asking),
     verification: form.financialsUploaded && form.taxFilingsUploaded,
     narrative: form.description.length > 40,
-    media: form.photosUploaded >= 3 && form.referencesAdded >= 1,
+    media: form.photoUrls.length >= 3 && form.references.length >= 1,
     phased: form.phasedAccepted && form.customPhases[form.customPhases.length - 1]?.ownership === 100,
     review: false,
   }), [form]);
@@ -327,6 +390,11 @@ export function SellerOnboardingPage() {
       status: 'pending_review',
       score: score,
       phases: form.customPhases,
+      photos: form.photoUrls,
+      documents: {
+        ...(form.financialsUploaded ? { financials_path: form.financialsUploaded } : {}),
+        ...(form.taxFilingsUploaded ? { tax_filings_path: form.taxFilingsUploaded } : {}),
+      },
     });
     setSubmitting(false);
     router.push('/seller/dashboard');
@@ -463,9 +531,15 @@ export function SellerOnboardingPage() {
                               type="file"
                               accept={u.accept}
                               style={{ display: 'none' }}
-                              onChange={e => {
+                              onChange={async e => {
                                 const file = e.target.files?.[0];
-                                if (file) setForm({ ...form, [u.k]: file.name });
+                                if (!file) return;
+                                const supabase = createClient();
+                                const { data: { session } } = await supabase.auth.getSession();
+                                if (!session) return;
+                                const path = `${session.user.id}/${u.k}/${Date.now()}_${file.name}`;
+                                const { error } = await supabase.storage.from('listing-documents').upload(path, file, { upsert: true });
+                                setForm(f => ({ ...f, [u.k]: error ? file.name : path }));
                               }}
                             />
                             <span className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
@@ -517,42 +591,78 @@ export function SellerOnboardingPage() {
               <div className="col gap-4">
                 <Field label="Photos" hint="Office, premises, team, product. Minimum 3 recommended.">
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                    {Array.from({ length: 8 }).map((_, i) => {
-                      const filled = i < form.photosUploaded;
-                      return (
-                        <button key={i} onClick={() => setForm({ ...form, photosUploaded: Math.min(8, form.photosUploaded + 1) })}
-                          className={filled ? 'img-ph' : ''}
-                          style={{
-                            aspectRatio: '1', borderRadius: 8, border: '0.5px dashed var(--border)',
-                            background: filled ? undefined : 'transparent',
-                            display: 'grid', placeItems: 'center', color: 'var(--muted)',
-                            cursor: filled ? 'default' : 'pointer',
-                          }}>
-                          {!filled && <Icon.Plus size={16} />}
+                    {form.photoUrls.map((url, i) => (
+                      <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden', border: '0.5px solid var(--border)' }}>
+                        <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                          onClick={() => setForm(f => ({ ...f, photoUrls: f.photoUrls.filter((_, j) => j !== i) }))}
+                          style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
+                        >
+                          <Icon.X size={10} />
                         </button>
-                      );
-                    })}
+                      </div>
+                    ))}
+                    {form.photoUrls.length < 8 && (
+                      <label style={{ aspectRatio: '1', borderRadius: 8, border: '0.5px dashed var(--border)', display: 'grid', placeItems: 'center', color: 'var(--muted)', cursor: 'pointer' }}>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          multiple
+                          style={{ display: 'none' }}
+                          onChange={async e => {
+                            const files = Array.from(e.target.files ?? []);
+                            if (!files.length) return;
+                            const supabase = createClient();
+                            const { data: { session } } = await supabase.auth.getSession();
+                            if (!session) return;
+                            const newUrls: string[] = [];
+                            for (const file of files) {
+                              if (form.photoUrls.length + newUrls.length >= 8) break;
+                              const path = `${session.user.id}/${Date.now()}_${file.name}`;
+                              const { error } = await supabase.storage.from('listing-photos').upload(path, file, { upsert: true });
+                              if (!error) {
+                                const { data: { publicUrl } } = supabase.storage.from('listing-photos').getPublicUrl(path);
+                                newUrls.push(publicUrl);
+                              }
+                            }
+                            setForm(f => ({ ...f, photoUrls: [...f.photoUrls, ...newUrls] }));
+                            e.target.value = '';
+                          }}
+                        />
+                        <Icon.Plus size={16} />
+                      </label>
+                    )}
                   </div>
+                  <span className="muted" style={{ fontSize: 12, marginTop: 4 }}>{form.photoUrls.length} / 8 geüpload · minimaal 3 vereist</span>
                 </Field>
 
                 <Field label="Trade references" hint="Customers, suppliers, advisors. Minimum 3 recommended.">
                   <div className="col gap-2">
-                    {Array.from({ length: 4 }).map((_, i) => {
-                      const added = i < form.referencesAdded;
-                      return (
-                        <button key={i} onClick={() => setForm({ ...form, referencesAdded: Math.min(4, form.referencesAdded + 1) })}
-                          className="row hair gap-3" style={{
-                            padding: 14, borderRadius: 8, textAlign: 'left',
-                            color: added ? 'var(--fg)' : 'var(--muted)',
-                            cursor: added ? 'default' : 'pointer',
-                          }}>
-                          <span style={{ width: 20, height: 20, borderRadius: '50%', border: '0.5px solid var(--border-strong)', display: 'grid', placeItems: 'center' }}>
-                            {added ? <Icon.Check size={10} color="#00A86B" /> : <Icon.Plus size={10} />}
-                          </span>
-                          <span style={{ fontSize: 13 }}>{added ? `Reference ${i + 1} — pending invitation sent` : 'Add reference'}</span>
+                    {form.references.map((r, i) => (
+                      <div key={i} className="row hair gap-3" style={{ padding: '10px 14px', borderRadius: 8, alignItems: 'center' }}>
+                        {r.status === 'verified'
+                          ? <Icon.Check size={12} color="#00A86B" />
+                          : <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#C8922A', display: 'inline-block', flexShrink: 0 }} />}
+                        <div className="col" style={{ flex: 1, gap: 1 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500 }}>{r.name}{r.company ? ` — ${r.company}` : ''}</span>
+                          <span className="muted" style={{ fontSize: 12 }}>{r.email}</span>
+                        </div>
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999,
+                          background: r.status === 'verified' ? '#00A86B18' : '#C8922A18',
+                          color: r.status === 'verified' ? '#00A86B' : '#C8922A', fontWeight: 500 }}>
+                          {r.status === 'verified' ? 'Verified' : 'Invite sent'}
+                        </span>
+                        <button onClick={() => setForm(f => ({ ...f, references: f.references.filter((_, j) => j !== i) }))} style={{ color: 'var(--muted)', cursor: 'pointer' }}>
+                          <Icon.X size={11} />
                         </button>
-                      );
-                    })}
+                      </div>
+                    ))}
+                    {form.references.length < 4 && (
+                      <ReferenceForm
+                        sellerName={form.name || 'the seller'}
+                        onAdd={ref => setForm(f => ({ ...f, references: [...f.references, ref] }))}
+                      />
+                    )}
                   </div>
                 </Field>
               </div>
@@ -706,10 +816,47 @@ type SellerListing = {
   location: string;
   asking_price: number;
   score: number;
+  verified: boolean;
   status: string;
   rejection_reason: string | null;
+  documents: { financials_path?: string; tax_filings_path?: string } | null;
   created_at: string;
 };
+
+type SellerDeal = {
+  id: string;
+  buyer: string;
+  phase: number;
+  status: string;
+  next: string;
+  nda_signed_buyer: boolean;
+  nda_signed_seller: boolean;
+};
+
+function KycGate({ status }: { status: string }) {
+  return (
+    <div className="col" style={{ padding: '64px 0', alignItems: 'center', gap: 20, textAlign: 'center' }}>
+      <div style={{ width: 56, height: 56, borderRadius: 16, background: '#C8922A18', display: 'grid', placeItems: 'center' }}>
+        <span style={{ color: '#C8922A' }}><Icon.Shield size={24} /></span>
+      </div>
+      <div className="col gap-2" style={{ maxWidth: 400 }}>
+        <p style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>
+          {status === 'pending' ? 'Verification under review' : 'Identity verification required'}
+        </p>
+        <p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+          {status === 'pending'
+            ? 'Your documents are being reviewed. This usually takes 1 business day. You\'ll receive an email when approved.'
+            : 'You need to verify your identity and confirm you\'re 18+ before you can buy or sell on SafeBusinessSelling.'}
+        </p>
+      </div>
+      {status !== 'pending' && (
+        <Button href="/verify-identity" variant="primary" iconRight={<Icon.Arrow size={12} />}>
+          Verify my identity
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function ListingStatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string }> = {
@@ -733,21 +880,61 @@ export function SellerDashboardPage() {
   const [section, setSection] = useState('overview');
   const [myListings, setMyListings] = useState<SellerListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
+  const [sellerDeals, setSellerDeals] = useState<SellerDeal[]>([]);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadListings() {
+    async function loadData() {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const { data } = await supabase
-        .from('listings')
-        .select('id, name, sector, location, asking_price, score, status, rejection_reason, created_at')
-        .eq('seller_id', session.user.id)
-        .order('created_at', { ascending: false });
-      setMyListings((data ?? []) as SellerListing[]);
+
+      const { data: profileData } = await supabase.from('profiles').select('kyc_status').eq('id', session.user.id).single();
+      setKycStatus(profileData?.kyc_status ?? 'none');
+
+      const [{ data: listingsData }, { data: convData }] = await Promise.all([
+        supabase
+          .from('listings')
+          .select('id, name, sector, location, asking_price, score, verified, status, rejection_reason, documents, created_at')
+          .eq('seller_id', session.user.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('conversations')
+          .select('id, buyer_id, current_phase, status, nda_signed_buyer, nda_signed_seller')
+          .eq('seller_id', session.user.id)
+          .neq('status', 'archived'),
+      ]);
+
+      setMyListings((listingsData ?? []) as SellerListing[]);
+
+      if (convData && convData.length > 0) {
+        const buyerIds = [...new Set(convData.map((c: { buyer_id: string }) => c.buyer_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', buyerIds);
+        const profileMap = Object.fromEntries(
+          (profilesData ?? []).map((p: { id: string; full_name: string | null; email: string }) => [p.id, p])
+        );
+        setSellerDeals(convData.map((c: { id: string; buyer_id: string; current_phase: number; status: string; nda_signed_buyer: boolean; nda_signed_seller: boolean }) => {
+          const p = profileMap[c.buyer_id] as { full_name: string | null; email: string } | undefined;
+          const buyer = p?.full_name ?? p?.email ?? 'Unknown buyer';
+          let status = 'NDA pending';
+          let next = 'Buyer reviewing teaser';
+          if (c.nda_signed_buyer && c.nda_signed_seller) {
+            status = 'NDA signed · escrow funded';
+            next = 'Awaiting data room request';
+          } else if (c.nda_signed_buyer) {
+            status = 'NDA signed by buyer';
+            next = 'Awaiting your NDA signature';
+          }
+          return { id: c.id, buyer, phase: c.current_phase ?? 1, status, next, nda_signed_buyer: c.nda_signed_buyer, nda_signed_seller: c.nda_signed_seller };
+        }));
+      }
+
       setListingsLoading(false);
     }
-    loadListings();
+    loadData();
   }, []);
 
   const inbox = [
@@ -755,11 +942,6 @@ export function SellerDashboardPage() {
     { from: 'Jana Visser', preview: 'I have a couple of follow-up questions on the EB...', date: 'Yesterday', unread: true, verified: true },
     { from: 'Deal coordinator', preview: 'Your verification is complete. Listing goes live...', date: '2 days ago', unread: false, verified: false, system: true },
     { from: 'Daan Bakker', preview: 'Would you be open to a phased timeline that ext...', date: '3 days ago', unread: false, verified: true },
-  ];
-
-  const activeDeals = [
-    { buyer: 'Marek Sokolski', phase: 1, fit: 94, status: 'NDA signed · escrow funded', next: 'Awaiting data room request' },
-    { buyer: 'Jana Visser', phase: 1, fit: 87, status: 'NDA pending signature', next: 'Buyer reviewing teaser' },
   ];
 
   return (
@@ -781,11 +963,12 @@ export function SellerDashboardPage() {
       </section>
 
       <section className="hair-b" style={{ padding: '24px 0' }}>
-        <div className="container row gap-6">
+        <div className="container">
+        <div className="dash-tabs row gap-6">
           {[
             { id: 'overview', l: 'Listing overview' },
             { id: 'inbox', l: 'Messages', n: 2 },
-            { id: 'deals', l: 'Active deals', n: 2 },
+            { id: 'deals', l: 'Active deals', n: sellerDeals.length || null },
             { id: 'score', l: 'Listing score' },
           ].map(t => (
             <button key={t.id} onClick={() => setSection(t.id)} className="row gap-2"
@@ -800,21 +983,23 @@ export function SellerDashboardPage() {
             </button>
           ))}
         </div>
+        </div>
       </section>
 
       <section style={{ padding: '32px 0 96px' }}>
         <div className="container">
+          {kycStatus !== null && kycStatus !== 'verified' ? <KycGate status={kycStatus} /> : <>
           {section === 'overview' && (
             <div className="col gap-6">
               {/* KPI row */}
-              <div className="row" style={{ gap: 0, border: '0.5px solid var(--border)', borderRadius: 10 }}>
+              <div className="kpi-grid" style={{ border: '0.5px solid var(--border)', borderRadius: 10 }}>
                 {[
                   { k: 'Listing score', v: '92%', d: '+5 this week', color: '#00A86B' },
                   { k: 'Listing views', v: '1,284', d: '+28% vs. last week' },
                   { k: 'Inbound interest', v: '14', d: '6 verified buyers' },
                   { k: 'Active deals', v: '2', d: 'Both in Phase 1' },
                 ].map((m, i) => (
-                  <div key={i} className="col gap-2" style={{ flex: 1, padding: 24, borderRight: i < 3 ? '0.5px solid var(--border)' : 'none' }}>
+                  <div key={i} className="kpi-cell col gap-2" style={{ flex: 1, padding: 24 }}>
                     <span className="muted" style={{ fontSize: 12 }}>{m.k}</span>
                     <span className="tabular" style={{ fontSize: 32, fontWeight: 500, letterSpacing: -1 }}>{m.v}</span>
                     <span className="muted" style={{ fontSize: 11, color: m.color || 'var(--muted)' }}>{m.d}</span>
@@ -822,7 +1007,7 @@ export function SellerDashboardPage() {
                 ))}
               </div>
 
-              <div className="row" style={{ gap: 16, alignItems: 'stretch' }}>
+              <div className="row mobile-wrap" style={{ gap: 16, alignItems: 'stretch' }}>
                 {/* Score card */}
                 <div className="card col gap-4" style={{ padding: 24, flex: 1 }}>
                   <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -865,12 +1050,13 @@ export function SellerDashboardPage() {
                   <a onClick={() => setSection('deals')} style={{ fontSize: 12, color: 'var(--blue)', cursor: 'pointer' }}>View all →</a>
                 </div>
                 <div className="col gap-3">
-                  {activeDeals.map((d, i) => (
-                    <div key={i} className="row hair" style={{ padding: 16, borderRadius: 8, gap: 24, alignItems: 'center' }}>
+                  {sellerDeals.length === 0 ? (
+                    <span className="muted" style={{ fontSize: 13 }}>No active deals yet.</span>
+                  ) : sellerDeals.map(d => (
+                    <div key={d.id} className="row hair mobile-col" style={{ padding: 16, borderRadius: 8, gap: 24, alignItems: 'center' }}>
                       <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--surface-2)', border: '0.5px solid var(--border)' }} />
                       <div className="col" style={{ minWidth: 160, gap: 2 }}>
                         <span style={{ fontSize: 14, fontWeight: 500 }}>{d.buyer}</span>
-                        <span className="muted" style={{ fontSize: 12 }}>Fit score {d.fit}</span>
                       </div>
                       <div className="col" style={{ flex: 1, minWidth: 0, gap: 6 }}>
                         <PhaseTracker phases={PHASES} currentPhase={d.phase} compact />
@@ -905,10 +1091,19 @@ export function SellerDashboardPage() {
                           <div className="row gap-3" style={{ alignItems: 'center' }}>
                             <span style={{ fontSize: 14, fontWeight: 500 }}>{l.name || '(no name)'}</span>
                             <ListingStatusBadge status={l.status} />
+                            {l.verified && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#00A86B18', color: '#00A86B', fontWeight: 500 }}>Verified</span>}
                           </div>
                           <span className="muted" style={{ fontSize: 12 }}>
                             {l.sector}{l.location ? ` · ${l.location}` : ''}{l.asking_price ? ` · €${(l.asking_price / 1_000_000).toFixed(1)}M` : ''}
                           </span>
+                          <div className="row gap-3" style={{ marginTop: 4 }}>
+                            <span style={{ fontSize: 11, color: (l.documents as { financials_path?: string } | null)?.financials_path ? '#00A86B' : 'var(--muted)' }}>
+                              {(l.documents as { financials_path?: string } | null)?.financials_path ? '✓' : '✗'} Financials
+                            </span>
+                            <span style={{ fontSize: 11, color: (l.documents as { tax_filings_path?: string } | null)?.tax_filings_path ? '#00A86B' : 'var(--muted)' }}>
+                              {(l.documents as { tax_filings_path?: string } | null)?.tax_filings_path ? '✓' : '✗'} Tax filings
+                            </span>
+                          </div>
                           {l.status === 'rejected' && l.rejection_reason && (
                             <div style={{ marginTop: 6, background: '#FF3B3011', border: '0.5px solid #FF3B3044', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#FF3B30' }}>
                               Rejected: {l.rejection_reason}
@@ -989,14 +1184,29 @@ export function SellerDashboardPage() {
 
           {section === 'deals' && (
             <div className="col gap-4">
-              {activeDeals.map((d, i) => (
-                <div key={i} className="card col gap-6" style={{ padding: 28 }}>
+              {sellerDeals.length === 0 ? (
+                <div className="col" style={{ padding: '64px 0', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--surface-2)', display: 'grid', placeItems: 'center' }}>
+                    <Icon.Building size={20} />
+                  </div>
+                  <div className="col gap-2">
+                    <p style={{ fontSize: 16, fontWeight: 500, margin: 0 }}>No active deals yet</p>
+                    <p className="muted" style={{ fontSize: 13, maxWidth: 360, margin: 0 }}>
+                      When buyers start a conversation and sign the NDA, their deals appear here with phase tracking.
+                    </p>
+                  </div>
+                </div>
+              ) : sellerDeals.map(d => (
+                <div key={d.id} className="card col gap-6" style={{ padding: 28 }}>
                   <div className="row" style={{ justifyContent: 'space-between' }}>
                     <div className="row gap-3">
                       <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--surface-2)', border: '0.5px solid var(--border)' }} />
                       <div className="col" style={{ gap: 2 }}>
-                        <div className="row gap-2"><span style={{ fontSize: 15, fontWeight: 500 }}>{d.buyer}</span><VerifiedBadge /></div>
-                        <span className="muted" style={{ fontSize: 12 }}>Fit score {d.fit} · Logistics operator</span>
+                        <div className="row gap-2">
+                          <span style={{ fontSize: 15, fontWeight: 500 }}>{d.buyer}</span>
+                          {d.nda_signed_buyer && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#00A86B18', color: '#00A86B', fontWeight: 500 }}>NDA signed</span>}
+                        </div>
+                        <span className="muted" style={{ fontSize: 12 }}>{d.status}</span>
                       </div>
                     </div>
                     <div className="row gap-2">
@@ -1009,7 +1219,7 @@ export function SellerDashboardPage() {
 
                   <div className="row hair" style={{ padding: 16, borderRadius: 8, alignItems: 'center', gap: 16 }}>
                     <Icon.Lock size={14} />
-                    <span style={{ fontSize: 13 }}>Escrow holds <span className="tabular" style={{ fontWeight: 500 }}>€5,000</span> refundable deposit. Next milestone: data room request.</span>
+                    <span style={{ fontSize: 13 }}>Next milestone: <span style={{ fontWeight: 500 }}>{d.next}</span></span>
                     <Button variant="ghost" size="sm" iconRight={<Icon.ArrowUpRight size={11} />}>Open deal room</Button>
                   </div>
                 </div>
@@ -1033,6 +1243,7 @@ export function SellerDashboardPage() {
               </div>
             </div>
           )}
+          </>}
         </div>
       </section>
     </div>
@@ -1042,29 +1253,21 @@ export function SellerDashboardPage() {
 type BuyerDeal = {
   id: string;
   listing: string;
+  listing_id: string;
   seller: string;
   phase: number;
   status: string;
   sellerPhases: { title: string; ownership: number }[];
   proposedPhases: { title: string; ownership: number }[] | null;
   proposalSent: boolean;
+  nda_signed_buyer: boolean;
+  nda_signed_seller: boolean;
 };
 
-const MOCK_BUYER_DEALS: BuyerDeal[] = [
-  {
-    id: '1',
-    listing: 'Northwind Logistics BV',
-    seller: 'Pieter van Dam',
-    phase: 1,
-    status: 'NDA signed · escrow funded',
-    sellerPhases: [
-      { title: 'LOI & Discovery', ownership: 0 },
-      { title: 'Operating handover', ownership: 51 },
-      { title: 'Full ownership', ownership: 100 },
-    ],
-    proposedPhases: null,
-    proposalSent: false,
-  },
+const DEFAULT_PHASES = [
+  { title: 'LOI & Discovery', ownership: 0 },
+  { title: 'Operating handover', ownership: 51 },
+  { title: 'Full ownership', ownership: 100 },
 ];
 
 export function BuyerDashboardPage() {
@@ -1075,8 +1278,9 @@ export function BuyerDashboardPage() {
   const [saved, setSaved] = useState<SavedRow[]>([]);
   const [ndas, setNdas] = useState<NdaRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deals, setDeals] = useState<BuyerDeal[]>(MOCK_BUYER_DEALS);
+  const [deals, setDeals] = useState<BuyerDeal[]>([]);
   const [proposingFor, setProposingFor] = useState<string | null>(null);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -1085,12 +1289,53 @@ export function BuyerDashboardPage() {
       if (!session) { router.push('/sign-in'); return; }
       setUser(session.user);
 
-      const [{ data: savedData }, { data: ndaData }] = await Promise.all([
+      const { data: profileData } = await supabase.from('profiles').select('kyc_status').eq('id', session.user.id).single();
+      setKycStatus(profileData?.kyc_status ?? 'none');
+
+      const [{ data: savedData }, { data: ndaData }, { data: convData }] = await Promise.all([
         supabase.from('saved_listings').select('*, listings(*)').eq('buyer_id', session.user.id),
         supabase.from('ndas').select('id, listing_id, status').eq('buyer_id', session.user.id),
+        supabase.from('conversations')
+          .select('id, listing_id, seller_id, current_phase, status, nda_signed_buyer, nda_signed_seller, listings(name, phases)')
+          .eq('buyer_id', session.user.id)
+          .neq('status', 'archived'),
       ]);
       setSaved((savedData ?? []) as SavedRow[]);
       setNdas((ndaData ?? []) as NdaRow[]);
+
+      if (convData && convData.length > 0) {
+        const sellerIds = [...new Set(convData.map((c: { seller_id: string }) => c.seller_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', sellerIds);
+        const profileMap = Object.fromEntries(
+          (profilesData ?? []).map((p: { id: string; full_name: string | null; email: string }) => [p.id, p])
+        );
+        setDeals(convData.map((c: { id: string; listing_id: string; seller_id: string; current_phase: number; status: string; nda_signed_buyer: boolean; nda_signed_seller: boolean; listings: { name: string; phases: unknown } | null }) => {
+          const sp = profileMap[c.seller_id] as { full_name: string | null; email: string } | undefined;
+          const seller = sp?.full_name ?? sp?.email ?? 'Unknown seller';
+          const rawPhases = c.listings?.phases;
+          const sellerPhases = Array.isArray(rawPhases) ? rawPhases as { title: string; ownership: number }[] : DEFAULT_PHASES;
+          let status = 'Active';
+          if (c.nda_signed_buyer && c.nda_signed_seller) status = 'NDA signed · books open';
+          else if (c.nda_signed_buyer) status = 'NDA signed by you · awaiting seller';
+          else status = 'NDA pending';
+          return {
+            id: c.id,
+            listing: c.listings?.name ?? 'Unknown listing',
+            listing_id: c.listing_id,
+            seller,
+            phase: c.current_phase ?? 1,
+            status,
+            sellerPhases,
+            proposedPhases: null,
+            proposalSent: false,
+            nda_signed_buyer: c.nda_signed_buyer,
+            nda_signed_seller: c.nda_signed_seller,
+          };
+        }));
+      }
 
       try {
         const raw = sessionStorage.getItem('sbs_matches');
@@ -1135,7 +1380,7 @@ export function BuyerDashboardPage() {
 
   const tabs = [
     { id: 'matches', l: 'AI matches', n: matches.length || null },
-    { id: 'deals', l: 'Active deals', n: null },
+    { id: 'deals', l: 'Active deals', n: deals.length || null },
     { id: 'payments', l: 'Payments & escrow', n: null },
     { id: 'saved', l: 'Saved listings', n: saved.length || null },
   ];
@@ -1172,7 +1417,8 @@ export function BuyerDashboardPage() {
       </section>
 
       <section className="hair-b" style={{ padding: '24px 0' }}>
-        <div className="container row gap-6">
+        <div className="container">
+        <div className="dash-tabs row gap-6">
           {tabs.map(t => (
             <button key={t.id} onClick={() => setSection(t.id)} className="row gap-2"
               style={{
@@ -1188,10 +1434,12 @@ export function BuyerDashboardPage() {
             </button>
           ))}
         </div>
+        </div>
       </section>
 
       <section style={{ padding: '32px 0 96px' }}>
         <div className="container">
+          {kycStatus !== null && kycStatus !== 'verified' ? <KycGate status={kycStatus} /> : <>
 
           {section === 'matches' && (
             <div className="col gap-4">
@@ -1220,8 +1468,8 @@ export function BuyerDashboardPage() {
                     const l = m.listing;
                     const ndaForListing = ndas.find(n => n.listing_id === String(l.id));
                     return (
-                      <div key={m.id} className="card row" style={{ padding: 0, overflow: 'hidden' }}>
-                        <div className="img-ph" style={{ width: 180, borderRadius: 0, borderRight: '0.5px solid var(--border)' }} />
+                      <div key={m.id} className="card match-card row" style={{ padding: 0, overflow: 'hidden' }}>
+                        <div className="match-card-img img-ph" style={{ width: 180, borderRadius: 0, borderRight: '0.5px solid var(--border)' }} />
                         <div className="col gap-3" style={{ flex: 1, padding: 24 }}>
                           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div className="col gap-2">
@@ -1425,12 +1673,13 @@ export function BuyerDashboardPage() {
                 <Button href="/marketplace" variant="primary" iconRight={<Icon.Arrow size={12} />}>Browse marketplace</Button>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                 {savedCards.map(l => <ListingCard key={l.id} listing={l} href={`/listing/${l.id}`} />)}
               </div>
             )
           )}
 
+          </>}
         </div>
       </section>
     </div>
