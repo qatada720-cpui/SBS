@@ -411,4 +411,35 @@ input:focus, textarea:focus, select:focus {
   .mobile-full { width: 100% !important; min-width: unset !important; max-width: 100% !important; flex: unset !important; }
   .mobile-grid-1 { grid-template-columns: 1fr !important; }
   .mobile-grid-2 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Dashboard KPI grid — 4 cells → 2×2 */
+  .kpi-grid { flex-wrap: wrap !important; }
+  .kpi-cell { flex: 0 0 50% !important; min-width: 0 !important; border-right: none !important; border-bottom: 0.5px solid var(--border) !important; }
+  .kpi-cell:nth-child(odd) { border-right: 0.5px solid var(--border) !important; }
+  .kpi-cell:nth-last-child(-n+2) { border-bottom: none !important; }
+
+  /* Dashboard tabs — horizontally scrollable */
+  .dash-tabs { overflow-x: auto; white-space: nowrap; }
+
+  /* Match cards — vertical on mobile */
+  .match-card { flex-direction: column !important; }
+  .match-card-img { width: 100% !important; height: 140px !important; border-right: none !important; border-bottom: 0.5px solid var(--border) !important; }
+
+  /* Messaging — hide sidebar when chat is open, back button visible */
+  .msg-back-btn { display: flex !important; }
+  [data-chat-active="true"] .msg-sidebar { display: none !important; }
+  [data-chat-active="false"] .msg-chat-area { display: none !important; }
+  .msg-sidebar { width: 100% !important; border-right: none !important; }
 }
+
+/* Dashboard tab scroll — shared */
+.dash-tabs { scrollbar-width: none; }
+.dash-tabs::-webkit-scrollbar { display: none; }
+
+/* KPI grid desktop defaults */
+.kpi-grid { display: flex; overflow: hidden; }
+.kpi-cell { border-right: 0.5px solid var(--border); }
+.kpi-cell:last-child { border-right: none; }
+
+/* Messaging layout */
+.msg-back-btn { display: none; }

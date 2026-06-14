@@ -28,15 +28,15 @@ const cols = [
     links: [
       { l: 'About', p: 'about' },
       { l: 'Contact', p: 'contact' },
-      { l: 'Trust & safety', p: 'about' },
+      { l: 'Trust & safety', p: 'how' },
       { l: 'Press', p: 'contact' },
     ],
   },
   {
     head: 'Legal',
     links: [
-      { l: 'Privacy', p: 'contact' },
-      { l: 'Terms', p: 'contact' },
+      { l: 'Privacy policy', p: 'privacy' },
+      { l: 'Terms of service', p: 'terms' },
       { l: 'Escrow agreement', p: 'how' },
       { l: 'NDA template', p: 'how' },
     ],
@@ -86,7 +86,7 @@ export function Footer() {
         </div>
 
         <div className="hair-t row" style={{ paddingTop: 24, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>© 2026 SafeBusineSSSelling B.V. Amsterdam, NL.</span>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>© 2026 SafeBusinessSelling B.V. Amsterdam, NL.</span>
           <span style={{ fontSize: 12, color: 'var(--muted)' }} className="row gap-2">
             <Icon.Dot size={5} color="#00A86B" /> All systems operational
           </span>

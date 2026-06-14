@@ -7,7 +7,6 @@ export async function proxy(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If env vars are missing, pass through without auth checks
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.next({ request });
   }
@@ -35,8 +34,7 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Redirect unauthenticated users away from protected pages
-  const protectedPaths = ['/dashboard', '/seller', '/buyer', '/messages', '/admin', '/ai-match'];
+  const protectedPaths = ['/dashboard', '/seller', '/buyer', '/messages', '/admin', '/deal', '/settings'];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
   if (isProtected && !user) {
     const signIn = new URL('/sign-in', request.url);
@@ -44,7 +42,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(signIn);
   }
 
-  // Redirect logged-in users away from auth pages
   const authPaths = ['/sign-in', '/sign-up'];
   const isAuth = authPaths.some((p) => pathname.startsWith(p));
   if (isAuth && user) {

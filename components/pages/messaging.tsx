@@ -240,10 +240,10 @@ export function MessagingPage() {
       </div>
 
       <div className="container" style={{ flex: 1, overflow: 'hidden', padding: '0 var(--container-px)', display: 'flex', gap: 0 }}>
-        <div style={{ display: 'flex', flex: 1, gap: 0, height: '100%', overflow: 'hidden' }}>
+        <div className="msg-layout" data-chat-active={activeId ? 'true' : 'false'} style={{ flex: 1, gap: 0, height: '100%', overflow: 'hidden' }}>
 
           {/* Sidebar */}
-          <div style={{ width: 300, flexShrink: 0, borderRight: '0.5px solid var(--hair)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div className="msg-sidebar" style={{ width: 300, flexShrink: 0, borderRight: '0.5px solid var(--hair)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '16px 16px 8px', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
               <div className="row" style={{ background: 'var(--surface)', borderRadius: 8, padding: '8px 12px', gap: 8, border: '0.5px solid var(--hair)' }}>
                 <Icon.Search size={13} />
@@ -255,6 +255,8 @@ export function MessagingPage() {
               <button
                 key={c.id}
                 onClick={() => setActiveId(c.id)}
+                aria-label={`${c.counterparty_name} — ${c.listing_name}`}
+                aria-pressed={activeId === c.id}
                 style={{
                   all: 'unset', display: 'flex', flexDirection: 'column', gap: 4,
                   padding: '14px 16px', cursor: 'pointer',
@@ -287,10 +289,21 @@ export function MessagingPage() {
 
           {/* Chat area */}
           {active && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="msg-chat-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {/* Header */}
               <div style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--hair)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <div className="col gap-1">
+                <div className="row gap-3" style={{ alignItems: 'flex-start', flex: 1 }}>
+                  <button
+                    className="msg-back-btn"
+                    onClick={() => setActiveId(null)}
+                    aria-label="Back to conversations"
+                    style={{ alignItems: 'center', justifyContent: 'center', height: 32, paddingTop: 2, color: 'var(--subtle)', cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    <svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                  <div className="col gap-1">
                   <div className="row gap-2" style={{ alignItems: 'center' }}>
                     <span style={{ fontSize: 15, fontWeight: 600 }}>{active.counterparty_name}</span>
                     <VerifiedBadge />
@@ -304,6 +317,7 @@ export function MessagingPage() {
                       {active.buyer_id === userId ? 'You are buying' : 'You are selling'}
                     </span>
                   </div>
+                  </div>
                 </div>
                 <div className="row gap-2">
                   {active.nda_signed
@@ -311,6 +325,7 @@ export function MessagingPage() {
                     : <Button size="sm" onClick={handleSignNda}>Sign NDA</Button>
                   }
                   <Button size="sm" variant="secondary" onClick={() => setShowSchedule(v => !v)}>Schedule call</Button>
+                  <Button size="sm" variant="secondary" href={`/deal/${active.id}`}>Deal room</Button>
                 </div>
               </div>
 
@@ -322,6 +337,7 @@ export function MessagingPage() {
                     onChange={e => setScheduleMsg(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && sendScheduleMessage()}
                     placeholder="Propose a time, e.g. Tuesday 14:00 CET"
+                    aria-label="Propose a call time"
                     style={{ flex: 1, fontSize: 13, background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--fg)', outline: 'none' }}
                     autoFocus
                   />
@@ -379,12 +395,15 @@ export function MessagingPage() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKey}
                     placeholder="Write a message… (Enter to send)"
+                    aria-label="Write a message"
                     rows={1}
                     style={{ flex: 1, resize: 'none', border: 'none', background: 'transparent', outline: 'none', fontSize: 14, color: 'var(--fg)', fontFamily: 'var(--font-inter)', lineHeight: 1.5 }}
                   />
                   <button
                     onClick={sendMessage}
                     disabled={!input.trim() || sending}
+                    aria-label="Send message"
+                    aria-disabled={!input.trim() || sending}
                     style={{
                       all: 'unset', width: 32, height: 32, borderRadius: '50%',
                       background: input.trim() && !sending ? '#0047FF' : 'var(--muted)',

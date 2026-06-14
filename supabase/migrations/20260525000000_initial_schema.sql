@@ -1,4 +1,4 @@
--- SafeBusineSSSelling — Supabase schema
+-- SafeBusinessSelling — Supabase schema
 -- Run this in the Supabase SQL editor to set up the database.
 
 -- ─── Extensions ───────────────────────────────────────────────────────────────

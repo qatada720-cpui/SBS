@@ -61,7 +61,7 @@ const FACTORS = [
     weight: 10,
     icon: 'Arrow',
     color: '#FF6B35',
-    description: 'Market size, competitive moat, and identifiable growth levers (untapped geographies, pricing power, product expansion). Assessed by SafeBusineSSSelling analysts using industry benchmarks.',
+    description: 'Market size, competitive moat, and identifiable growth levers (untapped geographies, pricing power, product expansion). Assessed by SafeBusinessSelling analysts using industry benchmarks.',
     subFactors: [
       { name: 'Addressable market size', pts: 4 },
       { name: 'Competitive differentiation', pts: 4 },
@@ -155,7 +155,7 @@ export function HowCalculatedPage() {
             How is the score<br />calculated?
           </h1>
           <p style={{ fontSize: 17, color: 'var(--subtle)', lineHeight: 1.7, fontWeight: 300, margin: 0 }}>
-            Every listing on SafeBusineSSSelling receives a Trust Score from 0 to 100. It's not a subjective rating — it's a structured, document-backed assessment across six verifiable dimensions. Here's exactly how it works.
+            Every listing on SafeBusinessSelling receives a Trust Score from 0 to 100. It's not a subjective rating — it's a structured, document-backed assessment across six verifiable dimensions. Here's exactly how it works.
           </p>
           <div className="row gap-3" style={{ flexWrap: 'wrap' }}>
             <span className="badge badge-verified">
@@ -269,7 +269,7 @@ export function HowCalculatedPage() {
           {[
             {
               q: 'Who performs the verification?',
-              a: "SafeBusineSSSelling works with a panel of certified accountants, legal advisors, and industry analysts. Every verification is performed by an independent third party — not by the seller.",
+              a: "SafeBusinessSelling works with a panel of certified accountants, legal advisors, and industry analysts. Every verification is performed by an independent third party — not by the seller.",
             },
             {
               q: 'Can a score decrease after listing?',

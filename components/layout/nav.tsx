@@ -46,6 +46,7 @@ export function Nav({ transparent = false }: { transparent?: boolean }) {
   return (
     <nav
       className="nav"
+      aria-label="Main navigation"
       style={
         transparent
           ? { background: 'transparent', backdropFilter: 'none', WebkitBackdropFilter: 'none', borderBottom: 'none' }
@@ -97,6 +98,8 @@ export function Nav({ transparent = false }: { transparent?: boolean }) {
           className="nav-mobile-btn"
           onClick={() => setOpen(o => !o)}
           aria-label={open ? 'Close menu' : 'Open menu'}
+          aria-expanded={open}
+          aria-controls="mobile-nav-menu"
           style={{ alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 6, background: 'transparent', color: 'var(--fg)' }}
         >
           {open ? <CloseIcon /> : <MenuIcon />}
@@ -105,7 +108,7 @@ export function Nav({ transparent = false }: { transparent?: boolean }) {
 
       {/* Mobile dropdown */}
       {open && (
-        <div className="nav-mobile-menu">
+        <div id="mobile-nav-menu" className="nav-mobile-menu" role="navigation" aria-label="Mobile navigation">
           <div className="container col gap-1">
             {NAV_LINKS.map((l) => (
               <Link
